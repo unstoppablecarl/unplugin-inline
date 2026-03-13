@@ -1,0 +1,96 @@
+import path from 'node:path'
+import { fileURLToPath } from 'url'
+import { describe, expect, it } from 'vitest'
+import { bundleAndRun, bundleAndRunSilent } from './_helpers'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const fixturesDir = path.resolve(__dirname, 'fixtures')
+
+describe('Functional Tests: Execution and Logic', () => {
+  it('should return correct value from inlined simple function', async () => {
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'simple-add.ts'))
+    expect((exports as any).result).toBe(30)
+  })
+
+  it('should handle logic with early returns', async () => {
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'early-return.ts'))
+    expect((exports as any).pos).toBe(true)
+    expect((exports as any).neg).toBe(false)
+  })
+
+  it('should handle complex parameters and order of evaluation', async () => {
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'complex-params.ts'))
+    expect((exports as any).result).toBe(2)
+    expect((exports as any).finalCounter).toBe(2)
+  })
+
+  it('should handle variables declared inside inlined function avoiding collision', async () => {
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'variable-collision.ts'))
+    expect((exports as any).outerX).toBe(100)
+    expect((exports as any).innerX).toBe(5)
+  })
+
+  it('should correct loop scoping when inlined inside a loop', async () => {
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'loop-scoping.ts'))
+    expect((exports as any).output).toEqual([0, 1, 4])
+  })
+
+  it('should handle nested function calls', async () => {
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'nested-calls.ts'))
+    expect((exports as any).val).toBe(40)
+  })
+
+  it('should handle undefined return (void function)', async () => {
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'void-function.ts'))
+    expect((exports as any).res).toBeUndefined()
+    expect((exports as any).finalSideEffect).toEqual({ a: 3 })
+  })
+
+  it('should report a structured error for directly recursive functions', async () => {
+    let caughtError: any
+    const fixturePath = path.join(fixturesDir, 'recursive-function.ts')
+
+    try {
+      await bundleAndRunSilent(fixturePath)
+    } catch (error) {
+      caughtError = error
+    }
+
+    expect(caughtError).toBeDefined()
+    expect(caughtError.errors).toBeDefined()
+
+    const firstError = caughtError.errors[0]
+    const errorText = firstError.text
+
+    expect(errorText).toContain('Validation failed')
+    expect(errorText).toContain('Cannot inline function \'factorial\': recursive calls are not supported.')
+
+    // Verify the exact file path, line, and column are in the formatted string
+    expect(errorText).toContain(fixturePath)
+    // Assuming the recursive call is on line 4, column 13:
+    expect(errorText).toContain(':4:13')
+  })
+
+  it('should skip transforming nested functions inside the inlined body', async () => {
+    const fixturePath = path.join(fixturesDir, 'nested-function.ts')
+    const result = await bundleAndRun(fixturePath)
+
+    // 5 + 10 = 15
+    expect((result.exports as any).result).toBe(15)
+
+    // Verify the inner return statement was NOT transformed into a break/label
+    // It should still look like a standard return because it belongs to the arrow function
+    expect(result.code).toMatch(/return x \+ .*?val.*?/)
+  })
+
+  it('should default missing arguments to undefined', async () => {
+    const fixturePath = path.join(fixturesDir, 'missing-arguments.ts')
+    const result = await bundleAndRun(fixturePath)
+
+    // 10 + undefined (handled by ternary) = 10
+    expect((result.exports as any).result).toBe(10)
+
+    // Verify the generated code contains the 'undefined' literal for the second param
+    expect(result.code).toMatch(/const .*?b.*? = void 0;/)
+  })
+})
