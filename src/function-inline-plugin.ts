@@ -3,10 +3,13 @@ import { parse } from '@babel/parser'
 import traverse, { type NodePath } from '@babel/traverse'
 import * as t from '@babel/types'
 import { createUnplugin } from 'unplugin'
+import { makeErrorManager } from './ErrorManager'
 
 export interface InlinePluginOptions {
   inlineIdentifier?: string
 }
+
+const globalInlineCache = new Map<string, { params: any[], body: any }>()
 
 export const inlinePlugin = createUnplugin((options: InlinePluginOptions = {}) => {
   const inlineIdentifier = options.inlineIdentifier || '@__INLINE__'
@@ -23,8 +26,8 @@ export const inlinePlugin = createUnplugin((options: InlinePluginOptions = {}) =
       const ast = parse(code, {
         sourceType: 'module',
         plugins: [
-          'typescript'
-        ]
+          'typescript',
+        ],
       })
 
       const inlineRegistry = new Map<string, {
@@ -32,21 +35,7 @@ export const inlinePlugin = createUnplugin((options: InlinePluginOptions = {}) =
         body: t.BlockStatement
       }>()
 
-      const errors: string[] = []
-
-      const reportError = (message: string, node: t.Node) => {
-        const loc = node.loc
-        let locationString = id
-
-        if (loc) {
-          const line = loc.start.line
-          const col = loc.start.column
-          locationString = `${id}:${line}:${col}`
-        }
-
-        const fullMessage = `${locationString} - ${message}`
-        errors.push(fullMessage)
-      }
+      const errorManager = makeErrorManager(id)
 
       const getInlineTarget = (path: NodePath<t.CallExpression>) => {
         const callee = path.node.callee
@@ -77,7 +66,7 @@ export const inlinePlugin = createUnplugin((options: InlinePluginOptions = {}) =
           if (binding && t.isFunctionDeclaration(binding.path.node)) {
             return {
               params: binding.path.node.params as t.Identifier[],
-              body: binding.path.node.body
+              body: binding.path.node.body,
             }
           }
         }
@@ -96,24 +85,24 @@ export const inlinePlugin = createUnplugin((options: InlinePluginOptions = {}) =
           let isValid = true
 
           if (path.node.async) {
-            reportError(`Cannot inline async function '${funcName}'`, path.node)
+            errorManager.recordError(`Cannot inline async function '${funcName}'`, path.node)
             isValid = false
           }
 
           if (path.node.generator) {
-            reportError(`Cannot inline generator function '${funcName}'`, path.node)
+            errorManager.recordError(`Cannot inline generator function '${funcName}'`, path.node)
             isValid = false
           }
 
           path.traverse({
             ThisExpression(innerPath) {
-              reportError(`Cannot inline function '${funcName}': uses 'this' keyword.`, innerPath.node)
+              errorManager.recordError(`Cannot inline function '${funcName}': uses 'this' keyword.`, innerPath.node)
               isValid = false
               innerPath.stop()
             },
             Identifier(innerPath) {
               if (innerPath.node.name === 'arguments') {
-                reportError(`Cannot inline function '${funcName}': uses 'arguments' keyword.`, innerPath.node)
+                errorManager.recordError(`Cannot inline function '${funcName}': uses 'arguments' keyword.`, innerPath.node)
                 isValid = false
                 innerPath.stop()
               }
@@ -121,35 +110,35 @@ export const inlinePlugin = createUnplugin((options: InlinePluginOptions = {}) =
             AssignmentExpression(innerPath) {
               const left = innerPath.node.left
               if (t.isIdentifier(left) && !path.scope.hasOwnBinding(left.name)) {
-                reportError(`Cannot inline function '${funcName}': mutates outer scope variable '${left.name}'.`, innerPath.node)
+                errorManager.recordError(`Cannot inline function '${funcName}': mutates outer scope variable '${left.name}'.`, innerPath.node)
                 isValid = false
               }
             },
             UpdateExpression(innerPath) {
               const arg = innerPath.node.argument
               if (t.isIdentifier(arg) && !path.scope.hasOwnBinding(arg.name)) {
-                reportError(`Cannot inline function '${funcName}': mutates outer scope variable '${arg.name}'.`, innerPath.node)
+                errorManager.recordError(`Cannot inline function '${funcName}': mutates outer scope variable '${arg.name}'.`, innerPath.node)
                 isValid = false
               }
             },
             CallExpression(innerPath) {
               const callee = innerPath.node.callee
               if (t.isIdentifier(callee) && callee.name === funcName) {
-                reportError(`Cannot inline function '${funcName}': recursive calls are not supported.`, innerPath.node)
+                errorManager.recordError(`Cannot inline function '${funcName}': recursive calls are not supported.`, innerPath.node)
                 isValid = false
                 innerPath.stop()
               }
-            }
+            },
           })
 
           if (isValid) {
             inlineRegistry.set(funcName, {
               params: path.node.params as t.Identifier[],
-              body: path.node.body
+              body: path.node.body,
             })
             path.remove()
           }
-        }
+        },
       })
 
       // 2. USAGE VALIDATION & TRANSFORMATION
@@ -163,8 +152,8 @@ export const inlinePlugin = createUnplugin((options: InlinePluginOptions = {}) =
 
           const unsafeParent = path.findParent((p) => p.isLogicalExpression() || p.isConditionalExpression())
           if (unsafeParent) {
-            reportError(`Cannot inline function '${funcName}': used in short-circuiting expression.`, path.node)
-            throw new Error(`[unplugin-inline] Usage Error:\n${errors.join('\n')}`)
+            errorManager.recordError(`Cannot inline function '${funcName}': used in short-circuiting expression.`, path.node)
+            throw errorManager.makeUsageError()
           }
 
           const resultId = path.scope.generateUidIdentifier(`${funcName}Result`)
@@ -178,12 +167,12 @@ export const inlinePlugin = createUnplugin((options: InlinePluginOptions = {}) =
             const cloned = t.cloneNode(argNode as t.Expression)
             const declarator = t.variableDeclarator(newParamId, cloned)
             return t.variableDeclaration('const', [
-              declarator
+              declarator,
             ])
           })
 
           const tempProgram = t.program([
-            t.blockStatement(funcData.body.body.map((n) => t.cloneNode(n)))
+            t.blockStatement(funcData.body.body.map((n) => t.cloneNode(n))),
           ])
           const tempFile = t.file(tempProgram, [], [])
 
@@ -200,23 +189,23 @@ export const inlinePlugin = createUnplugin((options: InlinePluginOptions = {}) =
                 const newId = path.scope.generateUidIdentifier(oldName)
                 varPath.scope.rename(oldName, newId.name)
               }
-            }
+            },
           })
 
           const transformedBody = (tempProgram.body[0] as t.BlockStatement).body
           const labeledBlock = t.labeledStatement(labelId, t.blockStatement([
             ...argDecls,
-            ...transformedBody
+            ...transformedBody,
           ]))
           const resultDecl = t.variableDeclaration('let', [
-            t.variableDeclarator(resultId)
+            t.variableDeclarator(resultId),
           ])
 
           const parentStmt = path.getStatementParent()
           if (parentStmt) {
             const inserted = parentStmt.insertBefore([
               resultDecl,
-              labeledBlock
+              labeledBlock,
             ])
             const labeledStmtPath = inserted[1]
 
@@ -229,33 +218,34 @@ export const inlinePlugin = createUnplugin((options: InlinePluginOptions = {}) =
                 if (Array.isArray(returnPath.container)) {
                   returnPath.replaceWithMultiple([
                     assign,
-                    breakStmt
+                    breakStmt,
                   ])
                 } else {
                   returnPath.replaceWith(t.blockStatement([
                     assign,
-                    breakStmt
+                    breakStmt,
                   ]))
                 }
               },
               Function(childPath) {
                 childPath.skip()
-              }
+              },
             })
 
             path.replaceWith(resultId)
           }
-        }
+        },
       })
 
-      if (errors.length > 0) {
-        throw new Error(`[unplugin-inline] Validation failed:\n${errors.join('\n')}`)
+      const validationError = errorManager.makeValidationError()
+      if (validationError) {
+        throw validationError
       }
 
       return generate(ast, {
-        sourceMaps: true
+        sourceMaps: true,
       }, code)
-    }
+    },
   }
 })
 
