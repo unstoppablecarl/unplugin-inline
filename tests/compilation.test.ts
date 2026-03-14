@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'url'
 import { describe, expect, it } from 'vitest'
-import { bundle, bundleAndRun, bundleSilent } from './_helpers'
+import { bundle, bundleSilent } from './_helpers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixturesDir = path.resolve(__dirname, 'fixtures')
