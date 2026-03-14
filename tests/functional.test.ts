@@ -12,6 +12,11 @@ describe('Functional Tests: Execution and Logic', () => {
     expect((exports as any).result).toBe(30)
   })
 
+  it('should return correct value from inlined simple arrow function', async () => {
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'simple-add-arrow.ts'))
+    expect((exports as any).result).toBe(15)
+  })
+
   it('should handle logic with early returns', async () => {
     const { exports } = await bundleAndRun(path.join(fixturesDir, 'early-return.ts'))
     expect((exports as any).pos).toBe(true)
