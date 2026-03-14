@@ -154,49 +154,36 @@ export function validateFunctionForInlining(
   return isValid
 }
 
-// export function isUsedInShortCircuit(path: NodePath<t.CallExpression>): boolean {
-//   let current: NodePath | null = path
-//   const stmt = path.getStatementParent()
-//
-//   while (current && current !== stmt) {
-//     const parent = current.parentPath!
-//     if (!parent) break
-//
-//     // Right side of && or ||
-//     if (parent.isLogicalExpression() && current.key === 'right') {
-//       return true
-//     }
-//
-//     // Consequent or Alternate of a ternary (a ? b : c)
-//     if (parent.isConditionalExpression() && (current.key === 'consequent' || current.key === 'alternate')) {
-//       return true
-//     }
-//
-//     // Right side of logical assignment (a ||= b)
-//     if (parent.isAssignmentExpression() && ['||=', '&&=', '??='].includes(parent.node.operator) && current.key === 'right') {
-//       return true
-//     }
-//
-//     // Optional chaining (a?.b())
-//     if (parent.isOptionalCallExpression() || parent.isOptionalMemberExpression()) {
-//       return true
-//     }
-//
-//     current = parent
-//   }
-//
-//   return false
-// }
+export function isUsedInShortCircuit(path: NodePath<t.CallExpression>): boolean {
+  let current: NodePath | null = path
+  const stmt = path.getStatementParent()
 
-// Inside your CallExpression visitor
-// const calledName = path.node.callee.name
-// const dependency = inlineRegistry.get(id, calledName)
-//
-// if (dependency) {
-//   if (isUsedInShortCircuit(path)) {
-//     errorManager.recordError(`Cannot inline function '${calledName}': used in short-circuiting expression.`, path.node)
-//     throw errorManager.makeValidationError()
-//   }
-//
-//   executeInlining(path, opts, dependency)
-// }
+  while (current && current !== stmt) {
+    const parent: NodePath<t.Node> = current.parentPath!
+    if (!parent) break
+
+    // Right side of && or ||
+    if (parent.isLogicalExpression() && current.key === 'right') {
+      return true
+    }
+
+    // Consequent or Alternate of a ternary (a ? b : c)
+    if (parent.isConditionalExpression() && (current.key === 'consequent' || current.key === 'alternate')) {
+      return true
+    }
+
+    // Right side of logical assignment (a ||= b)
+    if (parent.isAssignmentExpression() && ['||=', '&&=', '??='].includes(parent.node.operator) && current.key === 'right') {
+      return true
+    }
+
+    // Optional chaining (a?.b())
+    if (parent.isOptionalCallExpression() || parent.isOptionalMemberExpression()) {
+      return true
+    }
+
+    current = parent
+  }
+
+  return false
+}

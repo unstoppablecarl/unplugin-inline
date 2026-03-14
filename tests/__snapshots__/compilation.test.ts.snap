@@ -15,6 +15,25 @@ export {
 "
 `;
 
+exports[`Compilation Tests: Code Transformation > should correct loop scoping when inlined inside a loop > /Users/carl/Code/unplugin-inline/tests/fixtures/loop-scoping.ts 1`] = `
+"const results = [];
+for (let i = 0; i < 3; i++) {
+  let _squareResult;
+  _squareLabel: {
+    const _arg_n = i;
+    const _t_res = _arg_n * _arg_n;
+    _squareResult = _t_res;
+    break _squareLabel;
+  }
+  results.push(_squareResult);
+}
+const output = results;
+export {
+  output
+};
+"
+`;
+
 exports[`Compilation Tests: Code Transformation > should handle functions with no return value (void) > /Users/carl/Code/unplugin-inline/tests/fixtures/void-function.ts 1`] = `
 "let input = {
   a: 2
@@ -81,6 +100,24 @@ const result = _multiplyResult;
 const finalCounter = counter;
 export {
   finalCounter,
+  result
+};
+"
+`;
+
+exports[`Compilation Tests: Code Transformation > should inline a simple arrow function returning a literal > /Users/carl/Code/unplugin-inline/tests/fixtures/simple-add-arrow.ts 1`] = `
+"const add = (a, b) => {
+  return a + b;
+};
+let _addResult;
+_addLabel: {
+  const _arg_a = 5;
+  const _arg_b = 10;
+  _addResult = _arg_a + _arg_b;
+  break _addLabel;
+}
+const result = _addResult;
+export {
   result
 };
 "

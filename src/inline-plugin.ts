@@ -4,12 +4,12 @@ import traverse from '@babel/traverse'
 import * as t from '@babel/types'
 import { createUnplugin } from 'unplugin'
 import type { FileResolver, InlinePluginOptions, ResolvedImport } from './_types'
-import { makeErrorManager } from './lib/ErrorManager'
-import { type InlineRegistry, makeInlineRegistry } from './lib/InlineRegistry'
+import { type ErrorManager, makeErrorManager } from './lib/ErrorManager'
 import { executeInlining } from './lib/executeInlining'
 import { findInlineCandidates } from './lib/findInlineCandidates'
 import { flattenInlinedFunctions } from './lib/flattenInlinedFunctions'
-import { validateFunctionForInlining } from './lib/validateFunctionForInlining'
+import { type InlineRegistry, makeInlineRegistry } from './lib/InlineRegistry'
+import { isUsedInShortCircuit, validateFunctionForInlining } from './lib/validateFunctionForInlining'
 import { STANDARD_GLOBALS } from './standard-globals'
 
 interface TransformContext {
@@ -50,8 +50,11 @@ export const inlinePlugin = createUnplugin((options: Partial<InlinePluginOptions
 
       // validate candidates
       for (const path of candidatesInFile) {
-        const node = path.node
-        const funcName = node.id!.name
+        const isArrow = path.isVariableDeclarator()
+        const funcName = isArrow
+          ? (path.node.id as t.Identifier).name
+          : (path.node as t.FunctionDeclaration).id!.name
+
         const isValid = validateFunctionForInlining(
           id,
           opts,
@@ -64,17 +67,11 @@ export const inlinePlugin = createUnplugin((options: Partial<InlinePluginOptions
           inlineRegistry.delete(id, funcName)
           throw errorManager.makeValidationError()
         }
-
-        // set actual candidate blueprint
-        inlineRegistry.set(id, funcName, {
-          params: node.params as t.Identifier[],
-          body: t.cloneNode(node.body),
-        })
       }
 
       flattenInlinedFunctions(id, opts, candidatesInFile, inlineRegistry)
 
-      applyInlining(id, opts, ast, importMap, inlineRegistry)
+      applyInlining(id, opts, ast, importMap, errorManager, inlineRegistry)
 
       removeInlinedFunctions(ast, opts.inlineIdentifier)
 
@@ -94,6 +91,7 @@ export function applyInlining(
   opts: InlinePluginOptions,
   ast: t.File,
   importMap: Map<string, ResolvedImport>,
+  errorManager: ErrorManager,
   inlineRegistry: InlineRegistry,
 ) {
   traverse(ast, {
@@ -103,7 +101,15 @@ export function applyInlining(
       const name = path.node.callee.name
       const blueprint = resolveBlueprint(name, id, importMap, inlineRegistry)
 
-      if (blueprint) {
+      const calledName = path.node.callee.name
+      const dependency = inlineRegistry.get(id, calledName)
+
+      if (dependency) {
+        if (isUsedInShortCircuit(path)) {
+          errorManager.recordError(`Cannot inline function '${calledName}': used in short-circuiting expression.`, path.node)
+          throw errorManager.makeValidationError()
+        }
+
         executeInlining(path, opts, blueprint)
       }
     },
@@ -147,9 +153,3 @@ function resolveBlueprint(
     return inlineRegistry.get(imported.sourcePath, imported.originalName)
   }
 }
-
-export const vitePlugin = inlinePlugin.vite
-export const rollupPlugin = inlinePlugin.rollup
-export const esbuildPlugin = inlinePlugin.esbuild
-export const webpackPlugin = inlinePlugin.webpack
-export default inlinePlugin

@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'url'
 import { describe, expect, it } from 'vitest'
-import { bundle, bundleSilent } from './_helpers'
+import { bundle, bundleAndRun, bundleSilent } from './_helpers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixturesDir = path.resolve(__dirname, 'fixtures')
@@ -47,6 +47,12 @@ describe('Compilation Tests: Code Transformation', () => {
     expect(output).toMatchSnapshot(target)
     expect(output).toMatch(/const .*?x.*? = 5;/im)
     expect(output).toMatch(/const .*?x.*? = 100;/im)
+  })
+
+  it('should correct loop scoping when inlined inside a loop', async () => {
+    const target = path.join(fixturesDir, 'loop-scoping.ts')
+    const output = await bundle(target)
+    expect(output).toMatchSnapshot(target)
   })
 
   it('should handle parameter mapping correctly', async () => {
