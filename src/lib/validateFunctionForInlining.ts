@@ -1,8 +1,8 @@
 import { type NodePath, type Visitor } from '@babel/traverse'
 import * as t from '@babel/types'
 import type { InlinePluginOptions, ResolvedImport } from '../_types'
-import type { ErrorManager } from '../ErrorManager'
-import type { InlineRegistry } from '../InlineRegistry'
+import type { ErrorManager } from './ErrorManager'
+import type { InlineRegistry } from './InlineRegistry'
 
 export function validateFunctionForInlining(
   id: string,

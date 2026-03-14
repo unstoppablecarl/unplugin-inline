@@ -32,7 +32,7 @@ describe('Rollup Parity: Transformation & Validation', () => {
       caughtError = error
     }
 
-    expect(caughtError?.errors[0].text).toContain('Cannot inline async function \'doAsync\'')
+    expect(caughtError?.errors[0].text).toContain(`Cannot inline function 'doAsync': async functions are not supported.`)
   })
 
   it('should prevent outer scope mutation in Rollup', async () => {

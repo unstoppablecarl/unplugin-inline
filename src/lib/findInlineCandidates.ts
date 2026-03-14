@@ -1,7 +1,7 @@
 import traverse, { type NodePath } from '@babel/traverse'
 import * as t from '@babel/types'
 import type { FileResolver, InlinePluginOptions, ResolvedImport } from '../_types'
-import { type InlineRegistry } from '../InlineRegistry'
+import { type InlineRegistry } from './InlineRegistry'
 
 export async function findInlineCandidates(
   id: string,

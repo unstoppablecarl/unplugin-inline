@@ -1,8 +1,8 @@
 import traverse, { type NodePath } from '@babel/traverse'
 import * as t from '@babel/types'
 import type { InlinePluginOptions } from '../_types'
-import { makeErrorManager } from '../ErrorManager'
-import type { InlineRegistry } from '../InlineRegistry'
+import { makeErrorManager } from './ErrorManager'
+import type { InlineRegistry } from './InlineRegistry'
 import { executeInlining } from './executeInlining'
 
 export function flattenInlinedFunctions(

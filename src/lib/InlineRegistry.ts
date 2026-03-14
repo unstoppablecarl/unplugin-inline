@@ -1,5 +1,5 @@
 import { normalize } from 'node:path'
-import type { InlineTarget } from './_types'
+import type { InlineTarget } from '../_types'
 
 export type InlineRegistry = ReturnType<typeof makeInlineRegistry>
 
