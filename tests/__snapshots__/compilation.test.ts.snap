@@ -90,7 +90,14 @@ exports[`Compilation Tests: Code Transformation > should inline a simple arrow f
 "const add = (a, b) => {
   return a + b;
 };
-const result = add(10, 20);
+let _addResult;
+_addLabel: {
+  const _a = 10;
+  const _b = 20;
+  _addResult = _a + _b;
+  break _addLabel;
+}
+const result = _addResult;
 export {
   result
 };

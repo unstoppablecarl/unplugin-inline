@@ -6,12 +6,15 @@ import { bundle, bundleSilent } from './_helpers'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixturesDir = path.resolve(__dirname, 'fixtures')
 
+// @TODO add check for each that function does not exist in code
+
 describe('Compilation Tests: Code Transformation', () => {
   it('should inline a simple function returning a literal', async () => {
     const target = path.join(fixturesDir, 'simple-add.ts')
     const output = await bundle(target)
     expect(output).toMatchSnapshot(target)
   })
+
   it('should inline a simple arrow function returning a literal', async () => {
     const target = path.join(fixturesDir, 'simple-add-arrow.ts')
     const output = await bundle(target)

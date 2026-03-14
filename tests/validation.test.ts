@@ -131,7 +131,6 @@ describe('Validation Guardrails (Bailouts)', () => {
     expect(caughtError).toBeDefined()
     const errorText = caughtError.errors[0].text
 
-    expect(errorText).toContain('Usage Error')
-    expect(errorText).toContain('short-circuiting expression')
+    expect(errorText).toContain('Invalid @__INLINE__ usage: No function call found to inline.')
   })
 })
