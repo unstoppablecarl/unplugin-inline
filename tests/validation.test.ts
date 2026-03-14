@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'url'
 import { describe, expect, it } from 'vitest'
-import { bundleAndRun, bundleAndRunSilent } from './_helpers'
+import { bundleAndRunSilent } from './_helpers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixturesDir = path.resolve(__dirname, 'fixtures')
@@ -17,14 +17,15 @@ describe('Validation Guardrails (Bailouts)', () => {
       caughtError = error
     }
 
-    expect(caughtError).toBeDefined()
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
+
     expect(caughtError.errors).toBeDefined()
 
     const firstError = caughtError.errors[0]
     const errorText = firstError.text
 
     expect(errorText).toContain('Validation failed')
-    expect(errorText).toContain('Cannot inline async function \'doAsync\'')
+    expect(errorText).toContain(`Cannot inline function 'doAsync': async functions are not supported.`)
     expect(errorText).toContain(fixturePath)
   })
 
@@ -38,12 +39,12 @@ describe('Validation Guardrails (Bailouts)', () => {
       caughtError = error
     }
 
-    expect(caughtError).toBeDefined()
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
 
     const firstError = caughtError.errors[0]
     const errorText = firstError.text
 
-    expect(errorText).toContain('Cannot inline generator function \'doGen\'')
+    expect(errorText).toContain(`Cannot inline function 'doGen': generator functions are not supported.`)
   })
 
   it('should throw an error when the function uses the this keyword', async () => {
@@ -56,7 +57,7 @@ describe('Validation Guardrails (Bailouts)', () => {
       caughtError = error
     }
 
-    expect(caughtError).toBeDefined()
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
 
     const firstError = caughtError.errors[0]
     const errorText = firstError.text
@@ -74,7 +75,7 @@ describe('Validation Guardrails (Bailouts)', () => {
       caughtError = error
     }
 
-    expect(caughtError).toBeDefined()
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
 
     const firstError = caughtError.errors[0]
     const errorText = firstError.text
@@ -92,7 +93,7 @@ describe('Validation Guardrails (Bailouts)', () => {
       caughtError = error
     }
 
-    expect(caughtError).toBeDefined()
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
 
     const firstError = caughtError.errors[0]
     const errorText = firstError.text
@@ -110,7 +111,7 @@ describe('Validation Guardrails (Bailouts)', () => {
       caughtError = error
     }
 
-    expect(caughtError).toBeDefined()
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
 
     const firstError = caughtError.errors[0]
     const errorText = firstError.text
@@ -128,9 +129,9 @@ describe('Validation Guardrails (Bailouts)', () => {
       caughtError = error
     }
 
-    expect(caughtError).toBeDefined()
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
     const errorText = caughtError.errors[0].text
 
-    expect(errorText).toContain('Invalid @__INLINE__ usage: No function call found to inline.')
+    expect(errorText).toContain('Cannot inline function \'getOne\': used in short-circuiting expression.')
   })
 })

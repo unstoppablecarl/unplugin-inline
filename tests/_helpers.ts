@@ -1,8 +1,8 @@
 import type { BuildOptions, BuildResult } from 'esbuild'
 import { build } from 'esbuild'
 import { rollup } from 'rollup'
-import type { InlinePluginOptions } from '../src'
 import { esbuildPlugin, rollupPlugin } from '../src'
+import type { InlinePluginOptions } from '../src/_types'
 
 /**
  * Helper to format code with line numbers for debugging
@@ -19,15 +19,22 @@ function formatCode(code: string): string {
   return mappedLines.join('\n')
 }
 
-export async function bundleSilent(fixturePath: string, options: InlinePluginOptions = {}) {
+type InlinePluginTestOptions = Partial<Omit<InlinePluginOptions, 'variableNamePrefix'>>
+
+export async function bundleSilent(fixturePath: string, options: InlinePluginTestOptions = {}) {
   return bundle(fixturePath, options, true)
 }
+
+const TEST_VARIABLE_NAME_PREFIX = '_t_'
 
 /**
  * Runs esbuild with the inline plugin and returns the transformed code.
  * Used for testing the compilation output.
  */
-export async function bundle(fixturePath: string, options: InlinePluginOptions = {}, silent = false) {
+export async function bundle(fixturePath: string, options: InlinePluginTestOptions = {}, silent = false) {
+
+  // @ts-expect-error
+  options.variableNamePrefix = TEST_VARIABLE_NAME_PREFIX
   const buildOptions: BuildOptions = {
     entryPoints: [
       fixturePath,
@@ -48,7 +55,7 @@ export async function bundle(fixturePath: string, options: InlinePluginOptions =
   return result.outputFiles![0].text
 }
 
-export async function bundleAndRunSilent(fixturePath: string, options: InlinePluginOptions = {}) {
+export async function bundleAndRunSilent(fixturePath: string, options: InlinePluginTestOptions = {}) {
   return bundleAndRun(fixturePath, options, true)
 }
 
@@ -57,8 +64,10 @@ export async function bundleAndRunSilent(fixturePath: string, options: InlinePlu
  * and returns the exports and logs.
  * Used for testing the functional behavior of the inlined code.
  */
-export async function bundleAndRun(fixturePath: string, options: InlinePluginOptions = {}, silent = false) {
+export async function bundleAndRun(fixturePath: string, options: InlinePluginTestOptions = {}, silent = false) {
   let result: BuildResult
+  // @ts-expect-error
+  options.variableNamePrefix = TEST_VARIABLE_NAME_PREFIX
 
   try {
     const buildOptions: BuildOptions = {
@@ -129,8 +138,10 @@ export async function bundleAndRun(fixturePath: string, options: InlinePluginOpt
  * Runs Rollup with the inline plugin, executes the resulting code,
  * and returns the exports and logs.
  */
-export async function bundleAndRunRollup(fixturePath: string, options: InlinePluginOptions = {}) {
+export async function bundleAndRunRollup(fixturePath: string, options: InlinePluginTestOptions = {}) {
   const pluginInstance = rollupPlugin(options)
+  // @ts-expect-error
+  options.variableNamePrefix = TEST_VARIABLE_NAME_PREFIX
 
   try {
     const bundle = await rollup({

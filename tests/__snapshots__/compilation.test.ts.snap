@@ -3,9 +3,9 @@
 exports[`Compilation Tests: Code Transformation > should allow custom inline identifier > /Users/carl/Code/unplugin-inline/tests/fixtures/custom-identifier.ts 1`] = `
 "let _subtractResult;
 _subtractLabel: {
-  const _a = 10;
-  const _b = 5;
-  _subtractResult = _a - _b;
+  const _arg_a = 10;
+  const _arg_b = 5;
+  _subtractResult = _arg_a - _arg_b;
   break _subtractLabel;
 }
 const result = _subtractResult;
@@ -21,8 +21,8 @@ exports[`Compilation Tests: Code Transformation > should handle functions with n
 };
 let _doSomethingResult;
 _doSomethingLabel: {
-  const _obj = input;
-  _obj.a += 1;
+  const _arg_obj = input;
+  _arg_obj.a += 1;
   _doSomethingResult = void 0;
   break _doSomethingLabel;
 }
@@ -38,8 +38,8 @@ export {
 exports[`Compilation Tests: Code Transformation > should handle multiple return statements > /Users/carl/Code/unplugin-inline/tests/fixtures/early-return.ts 1`] = `
 "let _isPositiveResult;
 _isPositiveLabel: {
-  const _n = 10;
-  if (_n > 0) {
+  const _arg_n = 10;
+  if (_arg_n > 0) {
     _isPositiveResult = true;
     break _isPositiveLabel;
   }
@@ -49,8 +49,8 @@ _isPositiveLabel: {
 const pos = _isPositiveResult;
 let _isPositiveResult2;
 _isPositiveLabel2: {
-  const _n2 = -5;
-  if (_n2 > 0) {
+  const _arg_n2 = -5;
+  if (_arg_n2 > 0) {
     _isPositiveResult2 = true;
     break _isPositiveLabel2;
   }
@@ -72,9 +72,9 @@ function inc() {
 }
 let _multiplyResult;
 _multiplyLabel: {
-  const _a = inc();
-  const _b = inc();
-  _multiplyResult = _a * _b;
+  const _arg_a = inc();
+  const _arg_b = inc();
+  _multiplyResult = _arg_a * _arg_b;
   break _multiplyLabel;
 }
 const result = _multiplyResult;
@@ -86,30 +86,12 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should inline a simple arrow function returning a literal > /Users/carl/Code/unplugin-inline/tests/fixtures/simple-add-arrow.ts 1`] = `
-"const add = (a, b) => {
-  return a + b;
-};
-let _addResult;
-_addLabel: {
-  const _a = 10;
-  const _b = 20;
-  _addResult = _a + _b;
-  break _addLabel;
-}
-const result = _addResult;
-export {
-  result
-};
-"
-`;
-
 exports[`Compilation Tests: Code Transformation > should inline a simple function returning a literal > /Users/carl/Code/unplugin-inline/tests/fixtures/simple-add.ts 1`] = `
 "let _addResult;
 _addLabel: {
-  const _a = 10;
-  const _b = 20;
-  _addResult = _a + _b;
+  const _arg_a = 10;
+  const _arg_b = 20;
+  _addResult = _arg_a + _arg_b;
   break _addLabel;
 }
 const result = _addResult;
@@ -135,8 +117,8 @@ exports[`Compilation Tests: Code Transformation > should properly scope variable
 const outerX = x;
 let _getInnerXResult;
 _getInnerXLabel: {
-  const _x = 5;
-  _getInnerXResult = _x;
+  const _t_x = 5;
+  _getInnerXResult = _t_x;
   break _getInnerXLabel;
 }
 const innerX = _getInnerXResult;
@@ -150,9 +132,9 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on missing arguments > /Users/carl/Code/unplugin-inline/tests/fixtures/missing-arguments.js 1`] = `
 "let _addOptionalResult;
 _addOptionalLabel: {
-  const _a = 10;
-  const _b = void 0;
-  _addOptionalResult = _b === void 0 ? _a : _a + _b;
+  const _arg_a = 10;
+  const _arg_b = void 0;
+  _addOptionalResult = _arg_b === void 0 ? _arg_a : _arg_a + _arg_b;
   break _addOptionalLabel;
 }
 const result = _addOptionalResult;
@@ -162,17 +144,52 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on nested function calls > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-calls.js 1`] = `
+exports[`Compilation Tests: Code Transformation > should work on missing arguments > /Users/carl/Code/unplugin-inline/tests/fixtures/missing-arguments.ts 1`] = `
+"let _addOptionalResult;
+_addOptionalLabel: {
+  const _arg_a = 10;
+  const _arg_b = void 0;
+  _addOptionalResult = _arg_b === void 0 ? _arg_a : _arg_a + _arg_b;
+  break _addOptionalLabel;
+}
+const result = _addOptionalResult;
+export {
+  result
+};
+"
+`;
+
+exports[`Compilation Tests: Code Transformation > should work on nested function calls > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-inline-calls.js 1`] = `
 "let _quadrupleResult;
 _quadrupleLabel: {
-  const _n = 10;
-  let _doubleResult;
+  const _arg_n = 10;
+  let _t__doubleResult;
   _doubleLabel: {
-    const _n2 = _n;
-    _doubleResult = _n2 * 2;
+    const _t__arg_n = _t__arg_n;
+    _t__doubleResult = _t__arg_n * 2;
     break _doubleLabel;
   }
-  _quadrupleResult = _doubleResult * 2;
+  _quadrupleResult = _t__doubleResult * 2;
+  break _quadrupleLabel;
+}
+const val = _quadrupleResult;
+export {
+  val
+};
+"
+`;
+
+exports[`Compilation Tests: Code Transformation > should work on nested function calls > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-inline-calls.ts 1`] = `
+"let _quadrupleResult;
+_quadrupleLabel: {
+  const _arg_n = 10;
+  let _t__doubleResult;
+  _doubleLabel: {
+    const _t__arg_n = _t__arg_n;
+    _t__doubleResult = _t__arg_n * 2;
+    break _doubleLabel;
+  }
+  _quadrupleResult = _t__doubleResult * 2;
   break _quadrupleLabel;
 }
 const val = _quadrupleResult;
@@ -185,11 +202,28 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on nested functions > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-function.js 1`] = `
 "let _withNestedResult;
 _withNestedLabel: {
-  const _val = 5;
-  const _innerAdder = (x) => {
-    return x + _val;
+  const _arg_val = 5;
+  const _t_innerAdder = (x) => {
+    return x + val;
   };
-  _withNestedResult = _innerAdder(10);
+  _withNestedResult = _t_innerAdder(10);
+  break _withNestedLabel;
+}
+const result = _withNestedResult;
+export {
+  result
+};
+"
+`;
+
+exports[`Compilation Tests: Code Transformation > should work on nested functions > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-function.ts 1`] = `
+"let _withNestedResult;
+_withNestedLabel: {
+  const _arg_val = 5;
+  const _t_innerAdder = (x) => {
+    return x + _arg_val;
+  };
+  _withNestedResult = _t_innerAdder(10);
   break _withNestedLabel;
 }
 const result = _withNestedResult;
@@ -202,9 +236,9 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on plain JS files (without TS syntax) > /Users/carl/Code/unplugin-inline/tests/fixtures/plain-js.js 1`] = `
 "let _multiplyResult;
 _multiplyLabel: {
-  const _a = 2;
-  const _b = 3;
-  _multiplyResult = _a * _b;
+  const _arg_a = 2;
+  const _arg_b = 3;
+  _multiplyResult = _arg_a * _arg_b;
   break _multiplyLabel;
 }
 exports.res = _multiplyResult;

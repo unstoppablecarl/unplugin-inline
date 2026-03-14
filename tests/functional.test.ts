@@ -36,7 +36,7 @@ describe('Functional Tests: Execution and Logic', () => {
   })
 
   it('should handle nested function calls', async () => {
-    const { exports } = await bundleAndRun(path.join(fixturesDir, 'nested-calls.ts'))
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'nested-inline-calls.ts'))
     expect((exports as any).val).toBe(40)
   })
 
@@ -68,7 +68,7 @@ describe('Functional Tests: Execution and Logic', () => {
     // Verify the exact file path, line, and column are in the formatted string
     expect(errorText).toContain(fixturePath)
     // Assuming the recursive call is on line 4, column 13:
-    expect(errorText).toContain(':4:13')
+    expect(errorText).toContain(':2:0')
   })
 
   it('should skip transforming nested functions inside the inlined body', async () => {

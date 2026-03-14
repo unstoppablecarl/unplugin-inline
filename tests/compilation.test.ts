@@ -69,19 +69,19 @@ describe('Compilation Tests: Code Transformation', () => {
   })
 
   it('should work on nested function calls', async () => {
-    const target = path.join(fixturesDir, 'nested-calls.js')
+    const target = path.join(fixturesDir, 'nested-inline-calls.ts')
     const output = await bundle(target)
     expect(output).toMatchSnapshot(target)
   })
 
   it('should work on nested functions', async () => {
-    const target = path.join(fixturesDir, 'nested-function.js')
+    const target = path.join(fixturesDir, 'nested-function.ts')
     const output = await bundle(target)
     expect(output).toMatchSnapshot(target)
   })
 
   it('should work on missing arguments', async () => {
-    const target = path.join(fixturesDir, 'missing-arguments.js')
+    const target = path.join(fixturesDir, 'missing-arguments.ts')
     const output = await bundle(target)
     expect(output).toMatchSnapshot(target)
   })
