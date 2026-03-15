@@ -86,6 +86,12 @@ describe('Compilation Tests: Code Transformation', () => {
     expect(output).toMatchSnapshot(target)
   })
 
+  it('should work on deep nested functions', async () => {
+    const target = path.join(fixturesDir, 'deep-nested-functions.ts')
+    const output = await bundle(target)
+    expect(output).toMatchSnapshot(target)
+  })
+
   it('should work on missing arguments', async () => {
     const target = path.join(fixturesDir, 'missing-arguments.ts')
     const output = await bundle(target)

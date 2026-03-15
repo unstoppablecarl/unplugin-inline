@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'url'
 import { describe, expect, it } from 'vitest'
-import { bundleAndRun, bundleAndRunSilent } from './_helpers'
+import { bundle, bundleAndRun, bundleAndRunSilent } from './_helpers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixturesDir = path.resolve(__dirname, 'fixtures')
@@ -43,6 +43,11 @@ describe('Functional Tests: Execution and Logic', () => {
   it('should handle nested function calls', async () => {
     const { exports } = await bundleAndRun(path.join(fixturesDir, 'nested-inline-calls.ts'))
     expect((exports as any).val).toBe(40)
+  })
+
+  it('should handle deep nested functions', async () => {
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'deep-nested-functions.ts'))
+    expect((exports as any).result).toEqual(9.924716620639604)
   })
 
   it('should handle undefined return (void function)', async () => {
