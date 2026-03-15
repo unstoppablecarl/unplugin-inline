@@ -12,10 +12,6 @@ import { type InlineRegistry, makeInlineRegistry } from './lib/InlineRegistry'
 import { isUsedInShortCircuit, validateFunctionForInlining } from './lib/validateFunctionForInlining'
 import { STANDARD_GLOBALS } from './standard-globals'
 
-interface TransformContext {
-  resolve: (source: string, importer: string) => Promise<{ id: string } | null>
-}
-
 export const inlinePlugin = createUnplugin((options: Partial<InlinePluginOptions> = {}) => {
   const opts = {
     inlineIdentifier: '@__INLINE__',
