@@ -98,4 +98,11 @@ describe('Functional Tests: Execution and Logic', () => {
     // Verify the generated code contains the 'undefined' literal for the second param
     expect(result.code).toMatch(/const .*?b.*? = void 0;/)
   })
+
+  it('should work on imported inlined functions', async () => {
+    const fixturePath = path.join(fixturesDir, 'imported-function.ts')
+    const result = await bundleAndRun(fixturePath)
+
+    expect((result.exports as any).result).toBe(3)
+  })
 })

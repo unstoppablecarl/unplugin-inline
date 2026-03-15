@@ -24,6 +24,7 @@ export const inlinePlugin = createUnplugin((options: Partial<InlinePluginOptions
   }
 
   const inlineRegistry = makeInlineRegistry()
+  const globalVisitedFiles = new Set<string>()
 
   return {
     name: 'unplugin-inline',
@@ -48,11 +49,40 @@ export const inlinePlugin = createUnplugin((options: Partial<InlinePluginOptions
         resolver = makeFallbackResolver(opts.fileExtensions)
       }
 
+
+      const greedyProcessFile = async (targetPath: string) => {
+        if (globalVisitedFiles.has(targetPath)) return
+        globalVisitedFiles.add(targetPath)
+
+        try {
+          const fileCode = await fs.promises.readFile(targetPath, 'utf-8')
+          const fileAst = parse(fileCode, {
+            sourceType: 'module',
+            plugins: ['typescript']
+          })
+          const errMgr = makeErrorManager(targetPath)
+
+          const {
+            candidatesInFile,
+            importMap
+          } = await findInlineCandidates(targetPath, opts, fileAst, resolver, inlineRegistry, greedyProcessFile)
+
+          for (const { nodePath, normalizedName } of candidatesInFile) {
+            const isValid = validateFunctionForInlining(targetPath, opts, nodePath, errMgr, importMap, inlineRegistry)
+            if (!isValid) inlineRegistry.delete(targetPath, normalizedName)
+          }
+
+          flattenInlinedFunctions(targetPath, opts, candidatesInFile, inlineRegistry)
+        } catch (e) {
+          // Ignore unreadable files (e.g. built-in node modules)
+        }
+      }
+
       // 1. PHASE 1: Discovery
       const {
         candidatesInFile,
         importMap,
-      } = await findInlineCandidates(id, opts, ast, resolver, inlineRegistry)
+      } = await findInlineCandidates(id, opts, ast, resolver, inlineRegistry, greedyProcessFile)
 
       // validate candidates
       for (const { nodePath, normalizedName } of candidatesInFile) {

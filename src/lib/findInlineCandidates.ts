@@ -9,6 +9,7 @@ export async function findInlineCandidates(
   ast: t.File,
   resolver: FileResolver,
   inlineRegistry: InlineRegistry,
+  processImport: (path: string) => Promise<void>,
 ) {
   const importMap = new Map<string, ResolvedImport>()
   const candidatesInFile: InlineCandidate[] = []
@@ -22,6 +23,9 @@ export async function findInlineCandidates(
       const resolvedPath = await resolver(source, id)
       // If resolver returns null, we can't track this source.
       if (!resolvedPath) return
+
+      // 1. Immediately parse the imported file and extract its blueprints
+      await processImport(resolvedPath)
 
       node.specifiers.forEach(spec => {
         if (t.isImportSpecifier(spec) || t.isImportDefaultSpecifier(spec)) {

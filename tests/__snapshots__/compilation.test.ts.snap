@@ -163,6 +163,35 @@ export {
 "
 `;
 
+exports[`Compilation Tests: Code Transformation > should work on global function dependencies > /Users/carl/Code/unplugin-inline/tests/fixtures/math-global.ts 1`] = `
+"let _sqrtResult;
+_sqrtLabel: {
+  const _arg_a = 24;
+  _sqrtResult = Math.sqrt(_arg_a);
+  break _sqrtLabel;
+}
+const result = _sqrtResult;
+export {
+  result
+};
+"
+`;
+
+exports[`Compilation Tests: Code Transformation > should work on imported inlined functions > /Users/carl/Code/unplugin-inline/tests/fixtures/imported-function.ts 1`] = `
+"let _exportedAddResult;
+_exportedAddLabel: {
+  const _arg_a = 1;
+  const _arg_b = 2;
+  _exportedAddResult = _arg_a + _arg_b;
+  break _exportedAddLabel;
+}
+const result = _exportedAddResult;
+export {
+  result
+};
+"
+`;
+
 exports[`Compilation Tests: Code Transformation > should work on missing arguments > /Users/carl/Code/unplugin-inline/tests/fixtures/missing-arguments.js 1`] = `
 "let _addOptionalResult;
 _addOptionalLabel: {

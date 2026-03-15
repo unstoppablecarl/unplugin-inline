@@ -91,4 +91,16 @@ describe('Compilation Tests: Code Transformation', () => {
     const output = await bundle(target)
     expect(output).toMatchSnapshot(target)
   })
+
+  it('should work on global function dependencies', async () => {
+    const target = path.join(fixturesDir, 'math-global.ts')
+    const output = await bundle(target)
+    expect(output).toMatchSnapshot(target)
+  })
+
+  it('should work on imported inlined functions', async () => {
+    const target = path.join(fixturesDir, 'imported-function.ts')
+    const output = await bundle(target)
+    expect(output).toMatchSnapshot(target)
+  })
 })
