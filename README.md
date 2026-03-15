@@ -1,4 +1,3 @@
-
 # unplugin-inline
 
 AST-driven unplugin that supports inlining pure functions across Vite, Rollup, Webpack, and esbuild.
@@ -16,7 +15,8 @@ pnpm add -D unplugin-inline
 
 ## Usage
 
-Mark any pure function with the `/* @__INLINE__ */` directive. The plugin will remove the function declaration and inject its body directly into every place it is called.
+Mark any pure function with the `/* @__INLINE__ */` directive. The plugin will remove the function declaration and
+inject its body directly into every place it is called.
 
 **1. Mark your functions**
 
@@ -116,7 +116,8 @@ module.exports = {
 
 ### The Output
 
-The plugin handles local variable scoping and prevents collisions, replacing the function call with a flat, labeled block:
+The plugin handles local variable scoping and prevents collisions, replacing the function call with a flat, labeled
+block:
 
 `dist/output.js`
 
@@ -137,22 +138,27 @@ const result = _calculateSquareResult;
 
 The plugin accepts an options object when initialized:
 
-| Option             | Type        | Default                          | Description                                                                                                                                                                  |
-|--------------------|-------------|----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `inlineIdentifier` | `string`    | `'@__INLINE__'`                  | The comment string the plugin looks for to identify functions that should be inlined. We recommend `'@__INLINE__'` to match the visual style of standard bundler directives. |
-| `allowedGlobals`   | `strring[]` | [GLOBALS](src/inline-globals.ts) | variables/functions globally available                                                                                                                                       |
+| Option             | Type        | Default                         | Description                                                                                                                                                                  |
+|--------------------|-------------|---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `inlineIdentifier` | `string`    | `'@__INLINE__'`                 | The comment string the plugin looks for to identify functions that should be inlined. We recommend `'@__INLINE__'` to match the visual style of standard bundler directives. |
+| `allowedGlobals`   | `strring[]` | [See Defaults](src/defaults.ts) | variables/functions globally available                                                                                                                                       |
+| `fileExtensions`   | `string[]`  | [See Defaults](src/defaults.ts) | File extensions used by code files in your project                                                                                                                           |
 
 ## ⚠️ Requirements
 
-A function must be pure to be inlinable. The plugin enforces strict AST analysis and will throw build errors if you violate any of the following rules:
+A function must be pure to be inlinable. The plugin enforces strict AST analysis and will throw build errors if you
+violate any of the following rules:
 
 An inlined function must act as if every call to it could be correctly marked with `/*@__PURE__*/`
 
-* **No Async or Generators:** `async`/`await` and `function*` alter execution timing and cannot be safely inlined into synchronous blocks.
-* **No `this` or `arguments`:** The dynamic context of `this` and the `arguments` object will bind to the caller, resulting in unpredictable behavior.
+* **No Async or Generators:** `async`/`await` and `function*` alter execution timing and cannot be safely inlined into
+  synchronous blocks.
+* **No `this` or `arguments`:** The dynamic context of `this` and the `arguments` object will bind to the caller,
+  resulting in unpredictable behavior.
 * **No Outer Scope Mutations:** Inlined functions cannot reassign variables declared outside of their own block scope.
 * **No Outer Scope References:** Inlined functions cannot use any outer references. Standard globals are ok like `Math`.
-* **No Caller Expressions:** You cannot call an inlined function inside complex conditional expressions (like ternaries or `if (inlineFn())`). It must be called as a standalone statement or a direct variable assignment.
+* **No Caller Expressions:** You cannot call an inlined function inside complex conditional expressions (like ternaries
+  or `if (inlineFn())`). It must be called as a standalone statement or a direct variable assignment.
 * **Recursive Functions:** A recursive function cannot be inlined
 
 For more info on `/*@__PURE__*/` See:

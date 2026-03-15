@@ -75,3 +75,5 @@ export const STANDARD_GLOBALS = [
   'process',
   'require',
 ]
+
+export const FILE_EXTENSIONS = ['.ts', '.js', '.tsx', '.jsx', '.mjs', '.cjs']

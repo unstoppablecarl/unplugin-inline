@@ -17,6 +17,7 @@ export interface InlinePluginOptions {
   inlineIdentifier: string
   allowedGlobals: string[]
   variableNamePrefix: string
+  fileExtensions: string[]
 }
 
 export type InlineCandidate = {

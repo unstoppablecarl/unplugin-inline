@@ -2,6 +2,8 @@ import generate from '@babel/generator'
 import { parse } from '@babel/parser'
 import traverse from '@babel/traverse'
 import * as t from '@babel/types'
+import fs from 'node:fs'
+import path from 'node:path'
 import { createUnplugin } from 'unplugin'
 import type { FileResolver, InlinePluginOptions, ResolvedImport } from './_types'
 import { type ErrorManager, makeErrorManager } from './lib/ErrorManager'
@@ -10,12 +12,13 @@ import { findInlineCandidates } from './lib/findInlineCandidates'
 import { flattenInlinedFunctions } from './lib/flattenInlinedFunctions'
 import { type InlineRegistry, makeInlineRegistry } from './lib/InlineRegistry'
 import { isUsedInShortCircuit, validateFunctionForInlining } from './lib/validateFunctionForInlining'
-import { STANDARD_GLOBALS } from './standard-globals'
+import { FILE_EXTENSIONS, STANDARD_GLOBALS } from './defaults'
 
 export const inlinePlugin = createUnplugin((options: Partial<InlinePluginOptions> = {}) => {
   const opts = {
     inlineIdentifier: '@__INLINE__',
     allowedGlobals: STANDARD_GLOBALS,
+    fileExtensions: FILE_EXTENSIONS,
     variableNamePrefix: '',
     ...options,
   }
@@ -33,9 +36,16 @@ export const inlinePlugin = createUnplugin((options: Partial<InlinePluginOptions
       const ast = parse(code, { sourceType: 'module', plugins: ['typescript'] })
       const errorManager = makeErrorManager(cleanId)
 
-      const resolver: FileResolver = async (source: string, importer: string) => {
-        const resolved = await (this as any).resolve(source, importer)
-        return resolved ? resolved.id.split('?')[0] : null
+      let resolver: FileResolver
+
+      // Try Rollup/Vite's native resolver if available
+      if (typeof this.resolve === 'function') {
+        resolver = async (source: string, importer: string) => {
+          const resolved = await this.resolve(source, importer)
+          return resolved ? resolved.id.split('?')[0] : null
+        }
+      } else {
+        resolver = makeFallbackResolver(opts.fileExtensions)
       }
 
       // 1. PHASE 1: Discovery
@@ -156,5 +166,39 @@ function resolveBlueprint(
   const imported = importMap.get(name)
   if (imported) {
     return inlineRegistry.get(imported.sourcePath, imported.originalName)
+  }
+}
+
+function makeFallbackResolver(extensions: string[]): FileResolver {
+  return async (source: string, importer: string) => {
+
+    // 2. Fallback for esbuild/Webpack (handles local relative imports)
+    if (source.startsWith('.')) {
+      const importerDir = path.dirname(importer)
+      const absolutePath = path.resolve(importerDir, source)
+
+      for (const ext of extensions) {
+        if (fs.existsSync(absolutePath + ext)) {
+          return absolutePath + ext
+        }
+      }
+
+      // Check if it resolves perfectly without an extension (e.g., importing a folder index)
+      if (fs.existsSync(absolutePath)) {
+        const stat = fs.statSync(absolutePath)
+        if (stat.isDirectory()) {
+          for (const ext of extensions) {
+            const indexPath = path.join(absolutePath, 'index' + ext)
+            if (fs.existsSync(indexPath)) {
+              return indexPath
+            }
+          }
+        }
+        return absolutePath
+      }
+    }
+
+    // Return null for bare node_modules
+    return null
   }
 }

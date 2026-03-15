@@ -2,7 +2,7 @@ import { inlinePlugin } from './inline-plugin'
 
 export type { InlinePluginOptions } from './_types'
 
-export * from './standard-globals'
+export * from './defaults'
 
 export const vitePlugin = inlinePlugin.vite
 export const rollupPlugin = inlinePlugin.rollup
