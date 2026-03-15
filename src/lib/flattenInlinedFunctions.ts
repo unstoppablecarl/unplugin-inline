@@ -4,6 +4,7 @@ import type { InlineCandidate, InlinePluginOptions } from '../_types'
 import { makeErrorManager } from './ErrorManager'
 import { executeInlining } from './executeInlining'
 import type { InlineRegistry } from './InlineRegistry'
+
 const traverse = ((_traverse as any).default || _traverse) as typeof _traverse
 
 export function flattenInlinedFunctions(
@@ -12,31 +13,14 @@ export function flattenInlinedFunctions(
   candidatesInFile: InlineCandidate[],
   inlineRegistry: InlineRegistry,
 ): void {
-  const sortedNames = getSortedOrder(candidatesInFile)
+  // getSortedOrder now throws a validation error if a cycle is found
+  const sortedNames = getSortedOrder(id, candidatesInFile)
 
   for (const name of sortedNames) {
     const target = inlineRegistry.get(id, name)
+    if (!target || !target.body) continue
 
-    if (!target || !target.body) {
-      const err = makeErrorManager(id)
-      err.recordError(
-        `Internal Error: Blueprint for '${name}' was not found or is empty.`,
-        candidatesInFile.find(({ nodePath }) => {
-          const p = nodePath
-          return (t.isFunctionDeclaration(p.node) && p.node.id?.name === name) ||
-            (t.isVariableDeclarator(p.node) && t.isIdentifier((p.node as any).id) && (p.node as any).id.name === name)
-        })?.nodePath?.node, // Safely fall back to undefined if not found
-      )
-      throw err.makeValidationError()
-    }
-
-    // Wrap the blueprint body in a temporary file/program
-    // This gives Babel the necessary scope structures to perform renames
-    let b0 = target.body
-    let b1 = t.cloneNode(b0)
-    const tempFile = t.file(t.program([
-      ...b1.body,
-    ]))
+    const tempFile = t.file(t.program([...t.cloneNode(target.body).body]))
 
     traverse(tempFile, {
       CallExpression(path) {
@@ -62,38 +46,54 @@ export function flattenInlinedFunctions(
 }
 
 export function getSortedOrder(
+  id: string,
   candidatesInFile: InlineCandidate[],
 ): string[] {
-
-  const candidateNames = new Set(candidatesInFile.map(({ normalizedName }) => normalizedName))
+  const candidateMap = new Map<string, InlineCandidate>(
+    candidatesInFile.map(c => [c.normalizedName, c]),
+  )
 
   const visited = new Set<string>()
+  const recStack = new Set<string>()
   const result: string[] = []
 
-  // Build a simple adjacency list
+  // Pre-calculate dependencies
   const adj = new Map<string, Set<string>>()
-  for (const { normalizedName, normalizedBody } of candidatesInFile) {
-    adj.set(normalizedName, getLocalDependencies(normalizedBody, candidateNames))
+  for (const candidate of candidatesInFile) {
+    adj.set(candidate.normalizedName, getLocalDependencies(candidate.normalizedBody, new Set(candidateMap.keys())))
   }
 
   function visit(name: string) {
+    const candidate = candidateMap.get(name)
+    if (!candidate) return
+
+    if (recStack.has(name)) {
+      const err = makeErrorManager(id)
+      const cyclePath = [...recStack, name].join(' -> ')
+
+      // We pass the actual AST node of the function declaration to the error manager
+      err.recordError(
+        `Circular dependency detected in @__INLINE__ functions: ${cyclePath}`,
+        candidate.nodePath.node,
+      )
+      throw err.makeValidationError()
+    }
+
     if (visited.has(name)) return
 
+    recStack.add(name)
     const deps = adj.get(name)
     if (deps) {
       for (const dep of deps) {
-        // Note: Mutual recursion check is implicit here.
-        // If a cycle exists, this would technically infinite loop
-        // unless we add a "recStack" check.
         visit(dep)
       }
     }
-
+    recStack.delete(name)
     visited.add(name)
-    result.push(name) // Post-order: add yourself AFTER your dependencies
+    result.push(name)
   }
 
-  for (const name of candidateNames) {
+  for (const name of candidateMap.keys()) {
     visit(name)
   }
 

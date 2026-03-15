@@ -134,4 +134,19 @@ describe('Validation Guardrails (Bailouts)', () => {
 
     expect(errorText).toContain('Cannot inline function \'getOne\': used in short-circuiting expression.')
   })
+
+  it('should throw an error when a circular dependency is found.', async () => {
+    let caughtError: any
+    const fixturePath = path.join(fixturesDir, 'circular-dependency-bailout.ts')
+
+    try {
+      await bundleAndRunSilent(fixturePath)
+    } catch (error) {
+      caughtError = error
+    }
+
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
+    const errorText = caughtError.errors[0].text
+    expect(errorText).toContain(`Circular dependency detected in @__INLINE__ functions: addA -> addB -> addA`)
+  })
 })
