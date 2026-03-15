@@ -1,0 +1,53 @@
+name: Test
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+jobs:
+  Tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-v2-
+
+      - name: Install Node Modules
+        run: |
+          # Clean install on cache miss or integrity issues
+          if ! pnpm install --frozen-lockfile; then
+            echo "Install failed, clearing store and retrying..."
+            pnpm store prune
+            pnpm install --frozen-lockfile
+          fi
+
+      - name: Build the source code
+        run: pnpm run build
+
+      - name: Test the build output
+        run: pnpm run test

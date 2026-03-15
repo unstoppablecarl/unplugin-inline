@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  release:
+    # prevents this action from running on forks
+    if: github.repository == 'unstoppablecarl/unplugin-inline'
+    needs: [test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    # Use Release environment for deployment protection
+    environment: Release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-v2-
+
+      - name: Install deps
+        run: |
+          # Clean install on cache miss or integrity issues
+          if ! pnpm install; then
+            echo "Install failed, clearing store and retrying..."
+            pnpm store prune
+            pnpm install
+          fi
+
+      - name: Build
+        run: pnpm build
+
+      - name: Publish
+        id: publish
+        run: |
+          npm install -g npm@latest
+          npm publish --access public --provenance
