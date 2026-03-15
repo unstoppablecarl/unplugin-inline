@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Compilation Tests: Code Transformation > should allow custom inline identifier > /Users/carl/Code/unplugin-inline/tests/fixtures/custom-identifier.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should allow custom inline identifier > fixtures/custom-identifier.ts 1`] = `
 "let _subtractResult;
 _subtractLabel: {
   const [_arg_a, _arg_b] = [10, 5];
@@ -14,7 +14,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should correct loop scoping when inlined inside a loop > /Users/carl/Code/unplugin-inline/tests/fixtures/loop-scoping.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should correct loop scoping when inlined inside a loop > fixtures/loop-scoping.ts 1`] = `
 "const results = [];
 for (let i = 0; i < 3; i++) {
   let _squareResult;
@@ -33,7 +33,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should handle functions with no return value (void) > /Users/carl/Code/unplugin-inline/tests/fixtures/void-function.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should handle functions with no return value (void) > fixtures/void-function.ts 1`] = `
 "let input = {
   a: 2
 };
@@ -53,7 +53,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should handle multiple return statements > /Users/carl/Code/unplugin-inline/tests/fixtures/early-return.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should handle multiple return statements > fixtures/early-return.ts 1`] = `
 "let _isPositiveResult;
 _isPositiveLabel: {
   const [_arg_n] = [10];
@@ -83,7 +83,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should handle parameter mapping correctly > /Users/carl/Code/unplugin-inline/tests/fixtures/complex-params.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should handle parameter mapping correctly > fixtures/complex-params.ts 1`] = `
 "let counter = 0;
 function inc() {
   return ++counter;
@@ -103,7 +103,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should inline a simple arrow function returning a literal > /Users/carl/Code/unplugin-inline/tests/fixtures/simple-add-arrow.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should inline a simple arrow function returning a literal > fixtures/simple-add-arrow.ts 1`] = `
 "let _addResult;
 _addLabel: {
   const [_arg_a, _arg_b] = [5, 10];
@@ -117,7 +117,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should inline a simple function returning a literal > /Users/carl/Code/unplugin-inline/tests/fixtures/simple-add.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should inline a simple function returning a literal > fixtures/simple-add.ts 1`] = `
 "let _addResult;
 _addLabel: {
   const [_arg_a, _arg_b] = [10, 20];
@@ -131,7 +131,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should inline cross-file arrow functions and clean up unexported ones > /Users/carl/Code/unplugin-inline/tests/fixtures/import-arrow.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should inline cross-file arrow functions and clean up unexported ones > fixtures/import-arrow.ts 1`] = `
 "let _exportedArrowAddResult;
 _exportedArrowAddLabel: {
   const [_arg_a, _arg_b] = [10, 20];
@@ -158,7 +158,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should not inline functions without @inline comment > /Users/carl/Code/unplugin-inline/tests/fixtures/no-inline.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should not inline functions without @inline comment > fixtures/no-inline.ts 1`] = `
 "function keepMe() {
   return 1;
 }
@@ -169,7 +169,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should properly scope variables to avoid collisions > /Users/carl/Code/unplugin-inline/tests/fixtures/variable-collision.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should properly scope variables to avoid collisions > fixtures/variable-collision.ts 1`] = `
 "const x = 100;
 const outerX = x;
 let _getInnerXResult;
@@ -186,7 +186,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on deep nested functions > /Users/carl/Code/unplugin-inline/tests/fixtures/deep-nested-functions.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should work on deep nested functions > fixtures/deep-nested-functions.ts 1`] = `
 "const run = (val) => {
   let _level5Result2;
   _level5Label2: {
@@ -226,7 +226,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on default parameters > /Users/carl/Code/unplugin-inline/tests/fixtures/default-params.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should work on default parameters > fixtures/default-params.ts 1`] = `
 "let _defaultAddResult;
 _defaultAddLabel: {
   const [_arg_a, _arg_b = 10] = [5];
@@ -240,7 +240,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on global function dependencies > /Users/carl/Code/unplugin-inline/tests/fixtures/math-global.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should work on global function dependencies > fixtures/math-global.ts 1`] = `
 "let _sqrtResult;
 _sqrtLabel: {
   const [_arg_a] = [24];
@@ -254,7 +254,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on imported inlined functions > /Users/carl/Code/unplugin-inline/tests/fixtures/imported-function.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should work on imported inlined functions > fixtures/imported-function.ts 1`] = `
 "let _exportedAddResult;
 _exportedAddLabel: {
   const [_arg_a, _arg_b] = [1, 2];
@@ -268,7 +268,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on missing arguments > /Users/carl/Code/unplugin-inline/tests/fixtures/missing-arguments.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should work on missing arguments > fixtures/missing-arguments.ts 1`] = `
 "let _addOptionalResult;
 _addOptionalLabel: {
   const [_arg_a, _arg_b] = [10];
@@ -282,7 +282,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on multiple inline calls in a single statement > /Users/carl/Code/unplugin-inline/tests/fixtures/multiple-calls-on-one-line.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should work on multiple inline calls in a single statement > fixtures/multiple-calls-on-one-line.ts 1`] = `
 "let _addResult;
 _addLabel: {
   const [_arg_a, _arg_b] = [10, 20];
@@ -308,7 +308,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on nested function calls > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-inline-calls.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should work on nested function calls > fixtures/nested-inline-calls.ts 1`] = `
 "let _quadrupleResult;
 _quadrupleLabel: {
   const [_arg_n2] = [10];
@@ -328,7 +328,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on nested functions > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-function.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should work on nested functions > fixtures/nested-function.ts 1`] = `
 "let _withNestedResult;
 _withNestedLabel: {
   const [_arg_val] = [5];
@@ -345,7 +345,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on parameter destructuring > /Users/carl/Code/unplugin-inline/tests/fixtures/destructuring-params.ts 1`] = `
+exports[`Compilation Tests: Code Transformation > should work on parameter destructuring > fixtures/destructuring-params.ts 1`] = `
 "let _objAddResult;
 _objAddLabel: {
   const [{
@@ -365,7 +365,7 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on plain JS files (without TS syntax) > /Users/carl/Code/unplugin-inline/tests/fixtures/plain-js.js 1`] = `
+exports[`Compilation Tests: Code Transformation > should work on plain JS files (without TS syntax) > fixtures/plain-js.js 1`] = `
 "let _multiplyResult;
 _multiplyLabel: {
   const [_arg_a, _arg_b] = [2, 3];
