@@ -135,10 +135,9 @@ export function applyInlining(
       const name = path.node.callee.name
       const blueprint = resolveBlueprint(name, id, importMap, inlineRegistry)
 
-      const calledName = path.node.callee.name
-
       if (blueprint) {
         if (isUsedInShortCircuit(path)) {
+          const calledName = path.node.callee.name
           errorManager.recordError(`Cannot inline function '${calledName}': used in short-circuiting expression.`, path.node)
           throw errorManager.makeValidationError()
         }
@@ -146,10 +145,22 @@ export function applyInlining(
         executeInlining(path, opts, blueprint)
       }
     },
-    // We skip nested functions because we only inline into the main flow
-    // and those nested functions will be processed if they are called.
     Function(p) {
-      p.skip()
+      // 1. Identify the name of this function
+      const node = p.node
+      let name: string | undefined
+
+      if (t.isFunctionDeclaration(node) && node.id) {
+        name = node.id.name
+      } else if (p.parentPath.isVariableDeclarator() && t.isIdentifier(p.parentPath.node.id)) {
+        name = p.parentPath.node.id.name
+      }
+
+      // 2. ONLY skip if this specific function is in the registry.
+      // This prevents re-processing blueprints, but allows inlining into 'run'.
+      if (name && inlineRegistry.has(id, name)) {
+        p.skip()
+      }
     },
   })
 }

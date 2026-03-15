@@ -47,7 +47,7 @@ describe('Functional Tests: Execution and Logic', () => {
 
   it('should handle deep nested functions', async () => {
     const { exports } = await bundleAndRun(path.join(fixturesDir, 'deep-nested-functions.ts'))
-    expect((exports as any).result).toEqual(9.924716620639604)
+    expect((exports as any).run(99)).toEqual(9.924716620639604)
   })
 
   it('should handle undefined return (void function)', async () => {

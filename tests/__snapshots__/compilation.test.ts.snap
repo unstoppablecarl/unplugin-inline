@@ -187,39 +187,41 @@ export {
 `;
 
 exports[`Compilation Tests: Code Transformation > should work on deep nested functions > /Users/carl/Code/unplugin-inline/tests/fixtures/deep-nested-functions.ts 1`] = `
-"let _level5Result;
-_level5Label: {
-  const [_arg_val] = [99];
-  let _t__level4Result;
-  _level4Label: {
-    const [_t__arg_val2] = [_arg_val];
-    let _t__t__level3Result;
-    _level3Label: {
-      const [_t__t__arg_val] = [_t__arg_val2];
-      let _t__t__t__level2Result;
-      _level2Label: {
-        const [_t__t__t__arg_val2] = [_t__t__arg_val];
-        let _t__t__t__t__level1Result;
-        _level1Label: {
-          const [_t__t__t__t__arg_val] = [_t__t__t__arg_val2];
-          _t__t__t__t__level1Result = _t__t__t__t__arg_val + 1;
-          break _level1Label;
+"const run = (val) => {
+  let _level5Result2;
+  _level5Label2: {
+    const [_arg_val] = [val];
+    let _t__level4Result;
+    _level4Label: {
+      const [_t__arg_val2] = [_arg_val];
+      let _t__t__level3Result;
+      _level3Label: {
+        const [_t__t__arg_val] = [_t__arg_val2];
+        let _t__t__t__level2Result;
+        _level2Label: {
+          const [_t__t__t__arg_val2] = [_t__t__arg_val];
+          let _t__t__t__t__level1Result;
+          _level1Label: {
+            const [_t__t__t__t__arg_val] = [_t__t__t__arg_val2];
+            _t__t__t__t__level1Result = _t__t__t__t__arg_val + 1;
+            break _level1Label;
+          }
+          _t__t__t__level2Result = _t__t__t__t__level1Result * 2;
+          break _level2Label;
         }
-        _t__t__t__level2Result = _t__t__t__t__level1Result * 2;
-        break _level2Label;
+        _t__t__level3Result = _t__t__t__level2Result - 3;
+        break _level3Label;
       }
-      _t__t__level3Result = _t__t__t__level2Result - 3;
-      break _level3Label;
+      _t__level4Result = _t__t__level3Result / 2;
+      break _level4Label;
     }
-    _t__level4Result = _t__t__level3Result / 2;
-    break _level4Label;
+    _level5Result2 = Math.sqrt(Math.abs(_t__level4Result));
+    break _level5Label2;
   }
-  _level5Result = Math.sqrt(Math.abs(_t__level4Result));
-  break _level5Label;
-}
-const result = _level5Result;
+  return _level5Result2;
+};
 export {
-  result
+  run
 };
 "
 `;

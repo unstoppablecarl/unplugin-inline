@@ -9,7 +9,9 @@ export function executeInlining(
   opts: InlinePluginOptions,
   blueprint: { params: (t.Identifier | t.Pattern)[]; body: t.BlockStatement },
 ): void {
-  const callee = path.node.callee as t.Identifier
+  const callee = path.node.callee
+  if (!t.isIdentifier(callee)) return
+
   const funcName = callee.name
 
   const resultId = path.scope.generateUidIdentifier(`${funcName}Result`)
@@ -28,7 +30,7 @@ export function executeInlining(
         funcPath.get('params').forEach(paramPath => {
           const bindings = paramPath.getBindingIdentifiers()
           for (const name in bindings) {
-            // FIX: Use funcPath.scope so it sees internal blueprint variables!
+            // Use funcPath.scope so it sees internal blueprint variables
             const newName = funcPath.scope.generateUid(`_arg_${name}`)
             funcPath.scope.rename(name, newName)
           }
@@ -39,7 +41,6 @@ export function executeInlining(
       const bindings = declPath.getBindingIdentifiers()
       for (const name in bindings) {
         const prefix = opts.variableNamePrefix || '_in_'
-        // FIX: Use declPath.scope here as well
         const newName = declPath.scope.generateUid(`${prefix}${name}`)
         declPath.scope.rename(name, newName)
       }
@@ -79,8 +80,49 @@ export function executeInlining(
   })
 
   const parentStmt = path.getStatementParent()
-  if (parentStmt) {
-    parentStmt.insertBefore([t.variableDeclaration('let', [t.variableDeclarator(resultId)]), labeledBlock])
+  if (!parentStmt) return
+
+  // Find the closest block (like a function body or if-statement block)
+  const parentBlock = path.findParent(p => p.isBlockStatement())
+
+  if (parentBlock) {
+    // We are already in a block, just inject before the statement
+    parentStmt.insertBefore([
+      t.variableDeclaration('let', [t.variableDeclarator(resultId)]),
+      labeledBlock,
+    ])
+    path.replaceWith(resultId)
+  } else {
+    // We are likely in an arrow function expression: (val) => level5(val)
+    const arrowParent = path.findParent(p => p.isArrowFunctionExpression())
+
+// 1. Narrow the type using the Babel type guard
+    if (arrowParent && t.isArrowFunctionExpression(arrowParent.node)) {
+      const node = arrowParent.node
+
+      // 2. Only transform if it's an expression body (e.g., (x) => x + 1)
+      if (!t.isBlockStatement(node.body)) {
+        const bodyPath = arrowParent.get('body') as NodePath<t.Expression>
+        const originalBody = t.cloneNode(bodyPath.node)
+
+        // 3. Transform the body into a block statement
+        bodyPath.replaceWith(
+          t.blockStatement([
+            t.returnStatement(originalBody),
+          ]),
+        )
+
+        // 4. Re-run inlining now that the call is inside a block
+        executeInlining(path, opts, blueprint)
+        return
+      }
+    }
+
+    // Fallback for top-level or other cases
+    parentStmt.insertBefore([
+      t.variableDeclaration('let', [t.variableDeclarator(resultId)]),
+      labeledBlock,
+    ])
     path.replaceWith(resultId)
   }
 }

@@ -9,4 +9,4 @@ const level4 = (val: number) => level3(val) / 2
 // @__INLINE__
 const level5 = (val: number) => Math.sqrt(Math.abs(level4(val)))
 
-export const result = level5(99)
+export const run = (val: number) => level5(val)
