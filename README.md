@@ -25,8 +25,7 @@ Mark any pure function with the `/* @__INLINE__ */` directive. The plugin will r
 ```javascript
 /* @__INLINE__ */
 function calculateSquare(x) {
-  const multiplier = x;
-  return x * multiplier;
+  return x * x;
 }
 
 const a = 5;
@@ -138,29 +137,25 @@ const result = _calculateSquareResult;
 
 The plugin accepts an options object when initialized:
 
-| Option             | Type     | Default         | Description                                                                                                                                                                  |
-|--------------------|----------|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `inlineIdentifier` | `string` | `'@__INLINE__'` | The comment string the plugin looks for to identify functions that should be inlined. We recommend `'@__INLINE__'` to match the visual style of standard bundler directives. |
+| Option             | Type        | Default                          | Description                                                                                                                                                                  |
+|--------------------|-------------|----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `inlineIdentifier` | `string`    | `'@__INLINE__'`                  | The comment string the plugin looks for to identify functions that should be inlined. We recommend `'@__INLINE__'` to match the visual style of standard bundler directives. |
+| `allowedGlobals`   | `strring[]` | [GLOBALS](src/inline-globals.ts) | variables/functions globally available                                                                                                                                       |
 
-## ⚠️ Limitations & The Developer Contract
+## ⚠️ Requirements
 
-Because JavaScript is highly dynamic, this plugin **relies on you, the developer, to guarantee that the functions you mark for inlining are pure.** To prevent broken bundles, the plugin enforces strict AST analysis and will throw build errors if you violate any of the following rules:
+A function must be pure to be inlinable. The plugin enforces strict AST analysis and will throw build errors if you violate any of the following rules:
 
 An inlined function must act as if every call to it could be correctly marked with `/*@__PURE__*/`
 
 * **No Async or Generators:** `async`/`await` and `function*` alter execution timing and cannot be safely inlined into synchronous blocks.
 * **No `this` or `arguments`:** The dynamic context of `this` and the `arguments` object will bind to the caller, resulting in unpredictable behavior.
 * **No Outer Scope Mutations:** Inlined functions cannot reassign variables declared outside of their own block scope.
+* **No Outer Scope References:** Inlined functions cannot use any outer references. Standard globals are ok like `Math`.
 * **No Caller Expressions:** You cannot call an inlined function inside complex conditional expressions (like ternaries or `if (inlineFn())`). It must be called as a standalone statement or a direct variable assignment.
 * **Recursive Functions:** A recursive function cannot be inlined
 
-### 🚨 No Side-Effects 🚨
-
-Side-Effects are not statically verifiable in js and will **NOT** throw an error at compile time.
-
-Mutating an object property passed as an argument (e.g., `arg.count = 1`) is structurally supported by the inliner since JavaScript passes objects by reference. However, if that assignment triggers a hidden setter with external side effects, or unexpectedly mutates shared state, the plugin cannot detect it. You must ensure your object mutations do not violate the functional purity of the utility.
-
-See:
+For more info on `/*@__PURE__*/` See:
 
 * https://rollupjs.org/configuration-options/#pure
 * https://rollupjs.org/configuration-options/#no-side-effects
