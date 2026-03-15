@@ -16,6 +16,7 @@ async function runBenchmarkSuite() {
     [fixturesDir + '/deep-nesting.ts']: [randomInt],
     [fixturesDir + '/large-transform.ts']: [randomInt],
     [fixturesDir + '/branch-logic.ts']: [randomInt, randomInt, randomInt],
+    [fixturesDir + '/synthetic-large.ts']: [randomInt],
   }
 
   await eachCase(cases, ({ file, standard, inlined, args }) => {

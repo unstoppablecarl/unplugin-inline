@@ -1,11 +1,26 @@
 import * as esbuild from 'esbuild'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { esbuildPlugin } from '../src'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const targetFile = path.resolve(__dirname, '../tests/fixtures/default-params.ts')
+function printUsage(): void {
+  console.log(`
+Usage:
+  tsx preview.ts <file>
+
+Examples:
+  tsx preview.ts ./benchmark/fixtures/branch-logic.ts
+  tsx preview.ts ./benchmark/fixtures/large-transform.ts
+  `.trim())
+}
+
+const arg = process.argv[2]
+
+if (!arg || arg === '--help' || arg === '-h') {
+  printUsage()
+  process.exit(arg ? 0 : 1)
+}
+
+const targetFile = path.resolve(process.cwd(), arg)
 
 const preview = async () => {
   const result = await esbuild.build({
