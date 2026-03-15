@@ -1,26 +1,29 @@
-import generate from '@babel/generator'
+import _generate from '@babel/generator'
 import { parse } from '@babel/parser'
-import traverse from '@babel/traverse'
+import _traverse from '@babel/traverse'
 import * as t from '@babel/types'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createUnplugin } from 'unplugin'
 import type { FileResolver, InlinePluginOptions, ResolvedImport } from './_types'
+import { FILE_EXTENSIONS, STANDARD_GLOBALS } from './defaults'
 import { type ErrorManager, makeErrorManager } from './lib/ErrorManager'
 import { executeInlining } from './lib/executeInlining'
 import { findInlineCandidates } from './lib/findInlineCandidates'
 import { flattenInlinedFunctions } from './lib/flattenInlinedFunctions'
 import { type InlineRegistry, makeInlineRegistry } from './lib/InlineRegistry'
 import { isUsedInShortCircuit, validateFunctionForInlining } from './lib/validateFunctionForInlining'
-import { FILE_EXTENSIONS, STANDARD_GLOBALS } from './defaults'
 
-export const inlinePlugin = createUnplugin((options: Partial<InlinePluginOptions> = {}) => {
+const traverse = ((_traverse as any).default || _traverse) as typeof _traverse
+const generate = ((_generate as any).default || _generate) as typeof _generate
+
+export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOptions>) => {
   const opts = {
     inlineIdentifier: '@__INLINE__',
     allowedGlobals: STANDARD_GLOBALS,
     fileExtensions: FILE_EXTENSIONS,
     variableNamePrefix: '',
-    ...options,
+    ...options ?? {},
   }
 
   const inlineRegistry = makeInlineRegistry()
@@ -49,7 +52,6 @@ export const inlinePlugin = createUnplugin((options: Partial<InlinePluginOptions
         resolver = makeFallbackResolver(opts.fileExtensions)
       }
 
-
       const greedyProcessFile = async (targetPath: string) => {
         if (globalVisitedFiles.has(targetPath)) return
         globalVisitedFiles.add(targetPath)
@@ -58,13 +60,13 @@ export const inlinePlugin = createUnplugin((options: Partial<InlinePluginOptions
           const fileCode = await fs.promises.readFile(targetPath, 'utf-8')
           const fileAst = parse(fileCode, {
             sourceType: 'module',
-            plugins: ['typescript']
+            plugins: ['typescript'],
           })
           const errMgr = makeErrorManager(targetPath)
 
           const {
             candidatesInFile,
-            importMap
+            importMap,
           } = await findInlineCandidates(targetPath, opts, fileAst, resolver, inlineRegistry, greedyProcessFile)
 
           for (const { nodePath, normalizedName } of candidatesInFile) {

@@ -1,9 +1,10 @@
-import traverse from '@babel/traverse'
+import _traverse from '@babel/traverse'
 import * as t from '@babel/types'
 import type { InlineCandidate, InlinePluginOptions } from '../_types'
 import { makeErrorManager } from './ErrorManager'
 import { executeInlining } from './executeInlining'
 import type { InlineRegistry } from './InlineRegistry'
+const traverse = ((_traverse as any).default || _traverse) as typeof _traverse
 
 export function flattenInlinedFunctions(
   id: string,

@@ -1,6 +1,8 @@
-import traverse, { type NodePath } from '@babel/traverse'
+import _traverse, { type NodePath } from '@babel/traverse'
 import * as t from '@babel/types'
 import type { InlinePluginOptions } from '../_types'
+
+const traverse = ((_traverse as any).default || _traverse) as typeof _traverse
 
 export function executeInlining(
   path: NodePath<t.CallExpression>,
@@ -44,10 +46,20 @@ export function executeInlining(
     },
   }, path.scope)
 
-  const argDecls = dummyFunc.params.map((renamedParam, i) => {
-    const callerArg = callerArgs[i] || t.identifier('undefined')
-    return t.variableDeclaration('const', [t.variableDeclarator(renamedParam as any, callerArg)])
-  })
+  // 4. ASSEMBLE ARGUMENT DECLARATIONS
+  // Use array destructuring to perfectly map parameters to arguments
+  // This automatically supports defaults (b = 10), destructuring ({x, y}), and rest (...args)
+  const argDecls = []
+  if (dummyFunc.params.length > 0 || callerArgs.length > 0) {
+    argDecls.push(
+      t.variableDeclaration('const', [
+        t.variableDeclarator(
+          t.arrayPattern(dummyFunc.params as any),
+          t.arrayExpression(callerArgs),
+        ),
+      ]),
+    )
+  }
 
   const finalStatements = [...argDecls, ...dummyFunc.body.body]
   const labeledBlock = t.labeledStatement(labelId, t.blockStatement(finalStatements))

@@ -1,8 +1,8 @@
-import traverse from '@babel/traverse'
+import _traverse from '@babel/traverse'
 import * as t from '@babel/types'
 import type { FileResolver, InlineCandidate, InlinePluginOptions, ResolvedImport } from '../_types'
 import { type InlineRegistry } from './InlineRegistry'
-
+const traverse = ((_traverse as any).default || _traverse) as typeof _traverse
 export async function findInlineCandidates(
   id: string,
   opts: InlinePluginOptions,
