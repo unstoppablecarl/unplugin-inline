@@ -35,6 +35,12 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
     transformInclude(id) {
       return id.endsWith('.ts') || id.endsWith('.js')
     },
+    watchChange(id) {
+      const cleanId = id.split('?')[0]
+      globalVisitedFiles.delete(cleanId)
+
+      inlineRegistry.clearFile(cleanId)
+    },
     async transform(this: any, code: string, id: string) {
       const cleanId = id.split('?')[0]
       const ast = parse(code, { sourceType: 'module', plugins: ['typescript'] })
