@@ -32,6 +32,8 @@
     "rollup",
     "webpack",
     "plugin",
+    "performance",
+    "build",
     "inline",
     "function",
     "macro"
