@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'url'
 import { describe, expect, it } from 'vitest'
-import { bundle, bundleAndRun, bundleAndRunSilent } from './_helpers'
+import { bundleAndRun, bundleAndRunSilent } from './_helpers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixturesDir = path.resolve(__dirname, 'fixtures')
@@ -110,7 +110,7 @@ describe('Functional Tests: Execution and Logic', () => {
   it('should inline cross-file arrow functions and clean up unexported ones', async () => {
     const fixturePath = path.join(fixturesDir, 'import-arrow.ts')
 
-    const { exports, code } = await bundleAndRun(fixturePath)
+    const { exports } = await bundleAndRun(fixturePath)
 
     // 1. Verify the math executed correctly after inlining
     expect((exports as any).addResult).toBe(30)
