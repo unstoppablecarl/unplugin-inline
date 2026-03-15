@@ -2,7 +2,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'url'
 import { describe, expect, it } from 'vitest'
 import { bundleAndRun, bundleAndRunSilent } from './_helpers'
-import { multiplyResult } from './fixtures/import-arrow'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixturesDir = path.resolve(__dirname, 'fixtures')
@@ -93,11 +92,7 @@ describe('Functional Tests: Execution and Logic', () => {
     const fixturePath = path.join(fixturesDir, 'missing-arguments.ts')
     const result = await bundleAndRun(fixturePath)
 
-    // 10 + undefined (handled by ternary) = 10
     expect((result.exports as any).result).toBe(10)
-
-    // Verify the generated code contains the 'undefined' literal for the second param
-    expect(result.code).toMatch(/const .*?b.*? = void 0;/)
   })
 
   it('should work on imported inlined functions', async () => {
@@ -125,5 +120,14 @@ describe('Functional Tests: Execution and Logic', () => {
   it('should handle default parameters', async () => {
     const { exports } = await bundleAndRun(path.join(fixturesDir, 'default-params.ts'))
     expect((exports as any).result).toBe(15)
+  })
+
+  it('should handle multiple inline calls in a single statement', async () => {
+    const fixturePath = path.join(fixturesDir, 'multiple-calls-on-one-line.ts')
+    const bundleResult = await bundleAndRun(fixturePath)
+    const exports = bundleResult.exports as any
+
+    // 30 + 10 + 3 = 43
+    expect(exports.result).toBe(43)
   })
 })

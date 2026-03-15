@@ -3,8 +3,7 @@
 exports[`Compilation Tests: Code Transformation > should allow custom inline identifier > /Users/carl/Code/unplugin-inline/tests/fixtures/custom-identifier.ts 1`] = `
 "let _subtractResult;
 _subtractLabel: {
-  const _arg_a = 10;
-  const _arg_b = 5;
+  const [_arg_a, _arg_b] = [10, 5];
   _subtractResult = _arg_a - _arg_b;
   break _subtractLabel;
 }
@@ -20,7 +19,7 @@ exports[`Compilation Tests: Code Transformation > should correct loop scoping wh
 for (let i = 0; i < 3; i++) {
   let _squareResult;
   _squareLabel: {
-    const _arg_n = i;
+    const [_arg_n] = [i];
     const _t_res = _arg_n * _arg_n;
     _squareResult = _t_res;
     break _squareLabel;
@@ -40,7 +39,7 @@ exports[`Compilation Tests: Code Transformation > should handle functions with n
 };
 let _doSomethingResult;
 _doSomethingLabel: {
-  const _arg_obj = input;
+  const [_arg_obj] = [input];
   _arg_obj.a += 1;
   _doSomethingResult = void 0;
   break _doSomethingLabel;
@@ -57,7 +56,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should handle multiple return statements > /Users/carl/Code/unplugin-inline/tests/fixtures/early-return.ts 1`] = `
 "let _isPositiveResult;
 _isPositiveLabel: {
-  const _arg_n = 10;
+  const [_arg_n] = [10];
   if (_arg_n > 0) {
     _isPositiveResult = true;
     break _isPositiveLabel;
@@ -68,7 +67,7 @@ _isPositiveLabel: {
 const pos = _isPositiveResult;
 let _isPositiveResult2;
 _isPositiveLabel2: {
-  const _arg_n = -5;
+  const [_arg_n] = [-5];
   if (_arg_n > 0) {
     _isPositiveResult2 = true;
     break _isPositiveLabel2;
@@ -91,8 +90,7 @@ function inc() {
 }
 let _multiplyResult;
 _multiplyLabel: {
-  const _arg_a = inc();
-  const _arg_b = inc();
+  const [_arg_a, _arg_b] = [inc(), inc()];
   _multiplyResult = _arg_a * _arg_b;
   break _multiplyLabel;
 }
@@ -108,8 +106,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should inline a simple arrow function returning a literal > /Users/carl/Code/unplugin-inline/tests/fixtures/simple-add-arrow.ts 1`] = `
 "let _addResult;
 _addLabel: {
-  const _arg_a = 5;
-  const _arg_b = 10;
+  const [_arg_a, _arg_b] = [5, 10];
   _addResult = _arg_a + _arg_b;
   break _addLabel;
 }
@@ -123,8 +120,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should inline a simple function returning a literal > /Users/carl/Code/unplugin-inline/tests/fixtures/simple-add.ts 1`] = `
 "let _addResult;
 _addLabel: {
-  const _arg_a = 10;
-  const _arg_b = 20;
+  const [_arg_a, _arg_b] = [10, 20];
   _addResult = _arg_a + _arg_b;
   break _addLabel;
 }
@@ -138,8 +134,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should inline cross-file arrow functions and clean up unexported ones > /Users/carl/Code/unplugin-inline/tests/fixtures/import-arrow.ts 1`] = `
 "let _exportedArrowAddResult;
 _exportedArrowAddLabel: {
-  const _arg_a = 10;
-  const _arg_b = 20;
+  const [_arg_a, _arg_b] = [10, 20];
   _exportedArrowAddResult = _arg_a + _arg_b;
   break _exportedArrowAddLabel;
 }
@@ -148,8 +143,7 @@ let _useInternalResult;
 _useInternalLabel: {
   let _t__internalMultiplierResult;
   _internalMultiplierLabel: {
-    const _t__arg_x = 5;
-    const _t__arg_y = 10;
+    const [_t__arg_x, _t__arg_y] = [5, 10];
     _t__internalMultiplierResult = _t__arg_x * _t__arg_y;
     break _internalMultiplierLabel;
   }
@@ -209,7 +203,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on global function dependencies > /Users/carl/Code/unplugin-inline/tests/fixtures/math-global.ts 1`] = `
 "let _sqrtResult;
 _sqrtLabel: {
-  const _arg_a = 24;
+  const [_arg_a] = [24];
   _sqrtResult = Math.sqrt(_arg_a);
   break _sqrtLabel;
 }
@@ -223,8 +217,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on imported inlined functions > /Users/carl/Code/unplugin-inline/tests/fixtures/imported-function.ts 1`] = `
 "let _exportedAddResult;
 _exportedAddLabel: {
-  const _arg_a = 1;
-  const _arg_b = 2;
+  const [_arg_a, _arg_b] = [1, 2];
   _exportedAddResult = _arg_a + _arg_b;
   break _exportedAddLabel;
 }
@@ -235,26 +228,10 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on missing arguments > /Users/carl/Code/unplugin-inline/tests/fixtures/missing-arguments.js 1`] = `
-"let _addOptionalResult;
-_addOptionalLabel: {
-  const _arg_a = 10;
-  const _arg_b = void 0;
-  _addOptionalResult = _arg_b === void 0 ? _arg_a : _arg_a + _arg_b;
-  break _addOptionalLabel;
-}
-const result = _addOptionalResult;
-export {
-  result
-};
-"
-`;
-
 exports[`Compilation Tests: Code Transformation > should work on missing arguments > /Users/carl/Code/unplugin-inline/tests/fixtures/missing-arguments.ts 1`] = `
 "let _addOptionalResult;
 _addOptionalLabel: {
-  const _arg_a = 10;
-  const _arg_b = void 0;
+  const [_arg_a, _arg_b] = [10];
   _addOptionalResult = _arg_b === void 0 ? _arg_a : _arg_a + _arg_b;
   break _addOptionalLabel;
 }
@@ -265,22 +242,28 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on nested function calls > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-inline-calls.js 1`] = `
-"let _quadrupleResult;
-_quadrupleLabel: {
-  const _arg_n = 10;
-  let _t__doubleResult;
-  _doubleLabel: {
-    const _t__arg_n = _t__arg_n;
-    _t__doubleResult = _t__arg_n * 2;
-    break _doubleLabel;
-  }
-  _quadrupleResult = _t__doubleResult * 2;
-  break _quadrupleLabel;
+exports[`Compilation Tests: Code Transformation > should work on multiple inline calls in a single statement > /Users/carl/Code/unplugin-inline/tests/fixtures/multiple-calls-on-one-line.ts 1`] = `
+"let _addResult;
+_addLabel: {
+  const [_arg_a, _arg_b] = [10, 20];
+  _addResult = _arg_a + _arg_b;
+  break _addLabel;
 }
-const val = _quadrupleResult;
+let _addResult2;
+_addLabel2: {
+  const [_arg_a, _arg_b] = [5, 5];
+  _addResult2 = _arg_a + _arg_b;
+  break _addLabel2;
+}
+let _addResult3;
+_addLabel3: {
+  const [_arg_a, _arg_b] = [1, 2];
+  _addResult3 = _arg_a + _arg_b;
+  break _addLabel3;
+}
+const result = _addResult + _addResult2 + _addResult3;
 export {
-  val
+  result
 };
 "
 `;
@@ -288,10 +271,10 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on nested function calls > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-inline-calls.ts 1`] = `
 "let _quadrupleResult;
 _quadrupleLabel: {
-  const _arg_n2 = 10;
+  const [_arg_n2] = [10];
   let _t__doubleResult;
   _doubleLabel: {
-    const _t__arg_n = _arg_n2;
+    const [_t__arg_n] = [_arg_n2];
     _t__doubleResult = _t__arg_n * 2;
     break _doubleLabel;
   }
@@ -305,27 +288,10 @@ export {
 "
 `;
 
-exports[`Compilation Tests: Code Transformation > should work on nested functions > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-function.js 1`] = `
-"let _withNestedResult;
-_withNestedLabel: {
-  const _arg_val = 5;
-  const _t_innerAdder = (x) => {
-    return x + val;
-  };
-  _withNestedResult = _t_innerAdder(10);
-  break _withNestedLabel;
-}
-const result = _withNestedResult;
-export {
-  result
-};
-"
-`;
-
 exports[`Compilation Tests: Code Transformation > should work on nested functions > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-function.ts 1`] = `
 "let _withNestedResult;
 _withNestedLabel: {
-  const _arg_val = 5;
+  const [_arg_val] = [5];
   const _t_innerAdder = (x) => {
     return x + _arg_val;
   };
@@ -342,13 +308,13 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on parameter destructuring > /Users/carl/Code/unplugin-inline/tests/fixtures/destructuring-params.ts 1`] = `
 "let _objAddResult;
 _objAddLabel: {
-  const {
+  const [{
     a: _arg_a,
     b: _arg_b
-  } = {
+  }] = [{
     a: 4,
     b: 2
-  };
+  }];
   _objAddResult = _arg_a + _arg_b;
   break _objAddLabel;
 }
@@ -362,8 +328,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on plain JS files (without TS syntax) > /Users/carl/Code/unplugin-inline/tests/fixtures/plain-js.js 1`] = `
 "let _multiplyResult;
 _multiplyLabel: {
-  const _arg_a = 2;
-  const _arg_b = 3;
+  const [_arg_a, _arg_b] = [2, 3];
   _multiplyResult = _arg_a * _arg_b;
   break _multiplyLabel;
 }

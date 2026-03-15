@@ -121,4 +121,10 @@ describe('Compilation Tests: Code Transformation', () => {
     const output = await bundle(target)
     expect(output).toMatchSnapshot(target)
   })
+
+  it('should work on multiple inline calls in a single statement', async () => {
+    const target = path.join(fixturesDir, 'multiple-calls-on-one-line.ts')
+    const output = await bundle(target)
+    expect(output).toMatchSnapshot(target)
+  })
 })
