@@ -69,24 +69,32 @@ export async function findInlineCandidates(
     },
     //Arrow Functions
     VariableDeclarator(path) {
-      const { node } = path
+      const node = path.node
       const arrow = node.init
 
       if (t.isArrowFunctionExpression(arrow) && t.isIdentifier(node.id)) {
         const funcName = node.id.name
-        const parentDeclaration = path.parentPath
+        const parentDecl = path.parentPath
 
-        // Check for comment on the 'const/let/var' line
-        if (commentHasDirective(parentDeclaration?.node.leadingComments, opts)) {
+        // 1. Defensively check the parent type
+        if (!parentDecl.isVariableDeclaration()) return
 
-          // NORMALIZE: Ensure () => x becomes { return x; }
+        const grandParent = parentDecl.parentPath
+        const isExported = grandParent?.isExportNamedDeclaration()
+
+        // 2. Safely check comments on both the VariableDeclaration and the ExportNamedDeclaration
+        const hasLocalComment = commentHasDirective(parentDecl.node.leadingComments, opts)
+        const hasExportComment = isExported && commentHasDirective(grandParent.node.leadingComments, opts)
+
+        const isMarked = hasLocalComment || hasExportComment
+
+        if (isMarked) {
           let body: t.BlockStatement
+
           if (t.isBlockStatement(arrow.body)) {
             body = t.cloneNode(arrow.body)
           } else {
-            body = t.blockStatement([
-              t.returnStatement(t.cloneNode(arrow.body)),
-            ])
+            body = t.blockStatement([t.returnStatement(t.cloneNode(arrow.body))])
           }
 
           candidatesInFile.push({
@@ -94,6 +102,7 @@ export async function findInlineCandidates(
             normalizedBody: body,
             nodePath: path,
           })
+
           inlineRegistry.set(id, funcName, {
             params: arrow.params as t.Identifier[],
             body,

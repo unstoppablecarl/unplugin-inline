@@ -103,4 +103,10 @@ describe('Compilation Tests: Code Transformation', () => {
     const output = await bundle(target)
     expect(output).toMatchSnapshot(target)
   })
+
+  it('should inline cross-file arrow functions and clean up unexported ones', async () => {
+    const target = path.join(fixturesDir, 'import-arrow.ts')
+    const output = await bundle(target)
+    expect(output).toMatchSnapshot(target)
+  })
 })

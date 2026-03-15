@@ -135,6 +135,35 @@ export {
 "
 `;
 
+exports[`Compilation Tests: Code Transformation > should inline cross-file arrow functions and clean up unexported ones > /Users/carl/Code/unplugin-inline/tests/fixtures/import-arrow.ts 1`] = `
+"let _exportedArrowAddResult;
+_exportedArrowAddLabel: {
+  const _arg_a = 10;
+  const _arg_b = 20;
+  _exportedArrowAddResult = _arg_a + _arg_b;
+  break _exportedArrowAddLabel;
+}
+const addResult = _exportedArrowAddResult;
+let _useInternalResult;
+_useInternalLabel: {
+  let _t__internalMultiplierResult;
+  _internalMultiplierLabel: {
+    const _t__arg_x = 5;
+    const _t__arg_y = 10;
+    _t__internalMultiplierResult = _t__arg_x * _t__arg_y;
+    break _internalMultiplierLabel;
+  }
+  _useInternalResult = _t__internalMultiplierResult;
+  break _useInternalLabel;
+}
+const multiplyResult = _useInternalResult;
+export {
+  addResult,
+  multiplyResult
+};
+"
+`;
+
 exports[`Compilation Tests: Code Transformation > should not inline functions without @inline comment > /Users/carl/Code/unplugin-inline/tests/fixtures/no-inline.ts 1`] = `
 "function keepMe() {
   return 1;
