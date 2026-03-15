@@ -1,6 +1,6 @@
-import traverse, { type NodePath } from '@babel/traverse'
+import traverse from '@babel/traverse'
 import * as t from '@babel/types'
-import type { FileResolver, InlinePluginOptions, ResolvedImport } from '../_types'
+import type { FileResolver, InlineCandidate, InlinePluginOptions, ResolvedImport } from '../_types'
 import { type InlineRegistry } from './InlineRegistry'
 
 export async function findInlineCandidates(
@@ -11,7 +11,7 @@ export async function findInlineCandidates(
   inlineRegistry: InlineRegistry,
 ) {
   const importMap = new Map<string, ResolvedImport>()
-  const candidatesInFile: NodePath<t.FunctionDeclaration>[] = []
+  const candidatesInFile: InlineCandidate[] = []
 
   // PRE-RESOLVE IMPORTS
   // We scan the top-level body for ImportDeclarations
@@ -49,10 +49,17 @@ export async function findInlineCandidates(
         (t.isExportNamedDeclaration(path.parent) && commentHasDirective(path.parent.leadingComments, opts))
 
       if (isMarked) {
-        candidatesInFile.push(path)
+
+        const body = t.cloneNode(node.body)
         inlineRegistry.set(id, funcName, {
           params: node.params as t.Identifier[],
-          body: t.cloneNode(node.body),
+          body,
+        })
+
+        candidatesInFile.push({
+          normalizedName: funcName,
+          normalizedBody: body,
+          nodePath: path,
         })
       }
     },
@@ -78,7 +85,11 @@ export async function findInlineCandidates(
             ])
           }
 
-          candidatesInFile.push(path as any)
+          candidatesInFile.push({
+            normalizedName: funcName,
+            normalizedBody: body,
+            nodePath: path,
+          })
           inlineRegistry.set(id, funcName, {
             params: arrow.params as t.Identifier[],
             body,

@@ -1,3 +1,4 @@
+import type { NodePath } from '@babel/traverse'
 import * as t from '@babel/types'
 
 export type InlineTarget = {
@@ -16,4 +17,10 @@ export interface InlinePluginOptions {
   inlineIdentifier: string
   allowedGlobals: string[]
   variableNamePrefix: string
+}
+
+export type InlineCandidate = {
+  normalizedName: string
+  normalizedBody: t.BlockStatement
+  nodePath: NodePath<t.FunctionDeclaration | t.VariableDeclarator>
 }

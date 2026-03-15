@@ -68,8 +68,8 @@ _isPositiveLabel: {
 const pos = _isPositiveResult;
 let _isPositiveResult2;
 _isPositiveLabel2: {
-  const _arg_n2 = -5;
-  if (_arg_n2 > 0) {
+  const _arg_n = -5;
+  if (_arg_n > 0) {
     _isPositiveResult2 = true;
     break _isPositiveLabel2;
   }
@@ -106,10 +106,7 @@ export {
 `;
 
 exports[`Compilation Tests: Code Transformation > should inline a simple arrow function returning a literal > /Users/carl/Code/unplugin-inline/tests/fixtures/simple-add-arrow.ts 1`] = `
-"const add = (a, b) => {
-  return a + b;
-};
-let _addResult;
+"let _addResult;
 _addLabel: {
   const _arg_a = 5;
   const _arg_b = 10;
@@ -219,10 +216,10 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on nested function calls > /Users/carl/Code/unplugin-inline/tests/fixtures/nested-inline-calls.ts 1`] = `
 "let _quadrupleResult;
 _quadrupleLabel: {
-  const _arg_n = 10;
+  const _arg_n2 = 10;
   let _t__doubleResult;
   _doubleLabel: {
-    const _t__arg_n = _t__arg_n;
+    const _t__arg_n = _arg_n2;
     _t__doubleResult = _t__arg_n * 2;
     break _doubleLabel;
   }

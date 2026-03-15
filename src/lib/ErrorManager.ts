@@ -4,8 +4,8 @@ export type ErrorManager = ReturnType<typeof makeErrorManager>
 export function makeErrorManager(id: string) {
   const errors: string[] = []
 
-  const recordError = (message: string, node: t.Node) => {
-    const loc = node.loc
+  const recordError = (message: string, node?: t.Node) => {
+    const loc = node?.loc
     let locationString = id
 
     if (loc) {

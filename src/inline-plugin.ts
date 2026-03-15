@@ -45,22 +45,18 @@ export const inlinePlugin = createUnplugin((options: Partial<InlinePluginOptions
       } = await findInlineCandidates(id, opts, ast, resolver, inlineRegistry)
 
       // validate candidates
-      for (const path of candidatesInFile) {
-        const isArrow = path.isVariableDeclarator()
-        const funcName = isArrow
-          ? (path.node.id as t.Identifier).name
-          : (path.node as t.FunctionDeclaration).id!.name
-
+      for (const { nodePath, normalizedName } of candidatesInFile) {
         const isValid = validateFunctionForInlining(
           id,
           opts,
-          path,
+          nodePath,
           errorManager,
           importMap,
           inlineRegistry,
         )
+
         if (!isValid) {
-          inlineRegistry.delete(id, funcName)
+          inlineRegistry.delete(id, normalizedName)
           throw errorManager.makeValidationError()
         }
       }
@@ -98,9 +94,8 @@ export function applyInlining(
       const blueprint = resolveBlueprint(name, id, importMap, inlineRegistry)
 
       const calledName = path.node.callee.name
-      const dependency = inlineRegistry.get(id, calledName)
 
-      if (dependency) {
+      if (blueprint) {
         if (isUsedInShortCircuit(path)) {
           errorManager.recordError(`Cannot inline function '${calledName}': used in short-circuiting expression.`, path.node)
           throw errorManager.makeValidationError()
@@ -127,6 +122,20 @@ export function removeInlinedFunctions(ast: t.File, inlineIdentifier: string) {
       // If exported, other files might still need to import the actual function.
       if (isMarked && !t.isExportNamedDeclaration(path.parent)) {
         path.remove()
+      }
+    },
+    VariableDeclarator(path) {
+      const { node } = path
+      const arrow = node.init
+
+      if (t.isArrowFunctionExpression(arrow) && t.isIdentifier(node.id)) {
+        const parentDeclaration = path.parentPath
+        const isMarked = parentDeclaration?.node.leadingComments?.some(c => c.value.includes(inlineIdentifier))
+
+        if (isMarked && !t.isExportNamedDeclaration(parentDeclaration.parent)) {
+          // Remove just this declarator. If it's `const a = 1, b = () => {}`, 'a' survives.
+          path.remove()
+        }
       }
     },
   })

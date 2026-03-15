@@ -1,8 +1,8 @@
 import type { BuildOptions, BuildResult } from 'esbuild'
 import { build } from 'esbuild'
 import { rollup } from 'rollup'
+import type { InlinePluginOptions } from '../src'
 import { esbuildPlugin, rollupPlugin } from '../src'
-import type { InlinePluginOptions } from '../src/_types'
 
 /**
  * Helper to format code with line numbers for debugging

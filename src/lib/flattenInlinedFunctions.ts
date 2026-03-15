@@ -1,14 +1,14 @@
-import traverse, { type NodePath } from '@babel/traverse'
+import traverse from '@babel/traverse'
 import * as t from '@babel/types'
-import type { InlinePluginOptions } from '../_types'
+import type { InlineCandidate, InlinePluginOptions } from '../_types'
 import { makeErrorManager } from './ErrorManager'
-import type { InlineRegistry } from './InlineRegistry'
 import { executeInlining } from './executeInlining'
+import type { InlineRegistry } from './InlineRegistry'
 
 export function flattenInlinedFunctions(
   id: string,
   opts: InlinePluginOptions,
-  candidatesInFile: NodePath<t.FunctionDeclaration>[],
+  candidatesInFile: InlineCandidate[],
   inlineRegistry: InlineRegistry,
 ): void {
   const sortedNames = getSortedOrder(candidatesInFile)
@@ -16,16 +16,15 @@ export function flattenInlinedFunctions(
   for (const name of sortedNames) {
     const target = inlineRegistry.get(id, name)
 
-    // CRITICAL: If we found a candidate but it has no body, the registry is corrupt.
     if (!target || !target.body) {
-      let err = makeErrorManager(id)
+      const err = makeErrorManager(id)
       err.recordError(
         `Internal Error: Blueprint for '${name}' was not found or is empty.`,
-        // We try to find the node to point the error at
-        candidatesInFile.find(p =>
-          (t.isFunctionDeclaration(p.node) && p.node.id?.name === name) ||
-          (t.isVariableDeclarator(p.node) && t.isIdentifier((p.node as any).id) && (p.node as any).id.name === name),
-        )?.node!,
+        candidatesInFile.find(({ nodePath }) => {
+          const p = nodePath
+          return (t.isFunctionDeclaration(p.node) && p.node.id?.name === name) ||
+            (t.isVariableDeclarator(p.node) && t.isIdentifier((p.node as any).id) && (p.node as any).id.name === name)
+        })?.nodePath?.node, // Safely fall back to undefined if not found
       )
       throw err.makeValidationError()
     }
@@ -62,17 +61,18 @@ export function flattenInlinedFunctions(
 }
 
 export function getSortedOrder(
-  candidatesInFile: NodePath<t.FunctionDeclaration>[],
+  candidatesInFile: InlineCandidate[],
 ): string[] {
-  const candidateNames = new Set(candidatesInFile.map(f => f.node.id!.name))
+
+  const candidateNames = new Set(candidatesInFile.map(({ normalizedName }) => normalizedName))
+
   const visited = new Set<string>()
   const result: string[] = []
 
   // Build a simple adjacency list
   const adj = new Map<string, Set<string>>()
-  for (const path of candidatesInFile) {
-    const name = path.node.id!.name
-    adj.set(name, getLocalDependencies(path.node.body, candidateNames))
+  for (const { normalizedName, normalizedBody } of candidatesInFile) {
+    adj.set(normalizedName, getLocalDependencies(normalizedBody, candidateNames))
   }
 
   function visit(name: string) {
