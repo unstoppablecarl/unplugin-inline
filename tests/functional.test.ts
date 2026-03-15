@@ -116,4 +116,14 @@ describe('Functional Tests: Execution and Logic', () => {
     expect((exports as any).addResult).toBe(30)
     expect((exports as any).multiplyResult).toBe(50)
   })
+
+  it('should handle parameter destructuring', async () => {
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'destructuring-params.ts'))
+    expect((exports as any).result).toBe(6)
+  })
+
+  it('should handle default parameters', async () => {
+    const { exports } = await bundleAndRun(path.join(fixturesDir, 'default-params.ts'))
+    expect((exports as any).result).toBe(15)
+  })
 })

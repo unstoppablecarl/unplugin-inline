@@ -109,4 +109,16 @@ describe('Compilation Tests: Code Transformation', () => {
     const output = await bundle(target)
     expect(output).toMatchSnapshot(target)
   })
+
+  it('should work on parameter destructuring', async () => {
+    const target = path.join(fixturesDir, 'destructuring-params.ts')
+    const output = await bundle(target)
+    expect(output).toMatchSnapshot(target)
+  })
+
+  it('should work on default parameters', async () => {
+    const target = path.join(fixturesDir, 'default-params.ts')
+    const output = await bundle(target)
+    expect(output).toMatchSnapshot(target)
+  })
 })

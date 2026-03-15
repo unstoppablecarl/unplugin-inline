@@ -192,6 +192,20 @@ export {
 "
 `;
 
+exports[`Compilation Tests: Code Transformation > should work on default parameters > /Users/carl/Code/unplugin-inline/tests/fixtures/default-params.ts 1`] = `
+"let _defaultAddResult;
+_defaultAddLabel: {
+  const [_arg_a, _arg_b = 10] = [5];
+  _defaultAddResult = _arg_a + _arg_b;
+  break _defaultAddLabel;
+}
+const result = _defaultAddResult;
+export {
+  result
+};
+"
+`;
+
 exports[`Compilation Tests: Code Transformation > should work on global function dependencies > /Users/carl/Code/unplugin-inline/tests/fixtures/math-global.ts 1`] = `
 "let _sqrtResult;
 _sqrtLabel: {
@@ -319,6 +333,26 @@ _withNestedLabel: {
   break _withNestedLabel;
 }
 const result = _withNestedResult;
+export {
+  result
+};
+"
+`;
+
+exports[`Compilation Tests: Code Transformation > should work on parameter destructuring > /Users/carl/Code/unplugin-inline/tests/fixtures/destructuring-params.ts 1`] = `
+"let _objAddResult;
+_objAddLabel: {
+  const {
+    a: _arg_a,
+    b: _arg_b
+  } = {
+    a: 4,
+    b: 2
+  };
+  _objAddResult = _arg_a + _arg_b;
+  break _objAddLabel;
+}
+const result = _objAddResult;
 export {
   result
 };
