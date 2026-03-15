@@ -1,6 +1,11 @@
 # unplugin-inline
 
-AST-driven unplugin that supports inlining pure functions across Vite, Rollup, Webpack, and esbuild.
+AST-driven unplugin that inlines pure functions at build time across Vite, Rollup, Webpack, and esbuild.
+
+## Why
+
+V8 refuses to inline functions whose bytecode exceeds ~460 instructions, even on the hot path — every call still pays
+full frame setup cost at runtime. Marking a function with `/* @__INLINE__ */` moves that cost to build time instead.
 
 ## Installation
 
@@ -10,162 +15,150 @@ npm install -D unplugin-inline
 yarn add -D unplugin-inline
 # or
 pnpm add -D unplugin-inline
-
 ```
 
 ## Usage
 
-Mark any pure function with the `/* @__INLINE__ */` directive. The plugin will remove the function declaration and
-inject its body directly into every place it is called.
+Consider a physics simulation where `transformPoint` is called millions of times per frame. The function is large enough
+that V8 refuses to inline it automatically, so every call pays full frame setup cost at runtime.
 
-**1. Mark your functions**
+**`src/physics.ts`**
 
-`input.js`
-
-```javascript
+```ts
 /* @__INLINE__ */
-function calculateSquare(x) {
-  return x * x;
+function transformPoint(x: number, y: number, z: number, matrix: Float32Array): number {
+  const tx = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12]
+  const ty = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13]
+  const tz = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]
+  const tw = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15]
+  return Math.sqrt(tx * tx + ty * ty + tz * tz) / tw
 }
 
-const a = 5;
-const result = calculateSquare(a);
+// Called millions of times per frame — no function call overhead in the output
+export function processVertices(vertices: Float32Array, matrix: Float32Array): number {
+  let sum = 0
+  for (let i = 0; i < vertices.length; i += 3) {
+    sum += transformPoint(vertices[i], vertices[i + 1], vertices[i + 2], matrix)
+  }
+  return sum
+}
 ```
 
-**2. Add to your bundler config**
+The compiled output has no `transformPoint` declaration. Its body is placed directly at the call site as a flat labeled
+block:
 
-Because this is powered by `unplugin`, you can import the specific wrapper for your bundler of choice.
+**`dist/physics.js`**
 
-**Vite**
+```js
+function processVertices(vertices, matrix) {
+  let sum = 0;
+  for (let i = 0; i < vertices.length; i += 3) {
+    let _transformPointResult;
+    _transformPointLabel: {
+      const _x = vertices[i];
+      const _y = vertices[i + 1];
+      const _z = vertices[i + 2];
+      const _matrix = matrix;
+      const tx = _matrix[0] * _x + _matrix[4] * _y + _matrix[8] * _z + _matrix[12];
+      const ty = _matrix[1] * _x + _matrix[5] * _y + _matrix[9] * _z + _matrix[13];
+      const tz = _matrix[2] * _x + _matrix[6] * _y + _matrix[10] * _z + _matrix[14];
+      const tw = _matrix[3] * _x + _matrix[7] * _y + _matrix[11] * _z + _matrix[15];
+      _transformPointResult = Math.sqrt(tx * tx + ty * ty + tz * tz) / tw;
+    }
+    sum += _transformPointResult;
+  }
+  return sum;
+}
+```
 
-`vite.config.ts`
+Both block (`/* @__INLINE__ */`) and line (`// @__INLINE__`) comment styles are recognised.
 
-```javascript
-import { defineConfig } from 'vite';
-import { vitePlugin } from 'unplugin-inline';
+## Bundler Configuration
 
-const pluginOpts = {
-  inlineIdentifier: '@__MY_CUSTOM_INLINE__'
-};
+**Vite** — `vite.config.ts`
+
+```ts
+import { defineConfig } from 'vite'
+import { vitePlugin } from 'unplugin-inline'
 
 export default defineConfig({
-  plugins: [
-    vitePlugin(pluginOpts)
-  ]
-});
+  plugins: [vitePlugin()]
+})
 ```
 
-**esbuild / tsup**
+**esbuild / tsup** — `build.js`
 
-`build.js`
+```js
+import esbuild from 'esbuild'
+import { esbuildPlugin } from 'unplugin-inline'
 
-```javascript
-import esbuild from 'esbuild';
-import { esbuildPlugin } from 'unplugin-inline';
-
-const pluginOpts = {
-  inlineIdentifier: '@__MY_CUSTOM_INLINE__'
-};
-
-const buildOptions = {
+esbuild.build({
   entryPoints: ['input.js'],
   bundle: true,
-  plugins: [
-    esbuildPlugin(pluginOpts)
-  ]
-};
-
-esbuild.build(buildOptions);
+  plugins: [esbuildPlugin()],
+})
 ```
 
-**Rollup**
+**Rollup** — `rollup.config.js`
 
-`rollup.config.js`
-
-```javascript
-import { rollupPlugin } from 'unplugin-inline';
-
-const pluginOpts = {
-  inlineIdentifier: '@__MY_CUSTOM_INLINE__'
-};
+```js
+import { rollupPlugin } from 'unplugin-inline'
 
 export default {
   input: 'input.js',
-  plugins: [
-    rollupPlugin(pluginOpts)
-  ]
-};
+  plugins: [rollupPlugin()],
+}
 ```
 
-**Webpack**
+**Webpack** — `webpack.config.js`
 
-```javascript
-// webpack.config.js
-const { webpackPlugin } = require('unplugin-inline');
-
-const pluginOpts = {
-  inlineIdentifier: '@__MY_CUSTOM_INLINE__'
-};
+```js
+const { webpackPlugin } = require('unplugin-inline')
 
 module.exports = {
-  plugins: [
-    webpackPlugin(pluginOpts)
-  ]
-};
-```
-
-### The Output
-
-The plugin handles local variable scoping and prevents collisions, replacing the function call with a flat, labeled
-block:
-
-`dist/output.js`
-
-```javascript
-const a = 5;
-let _calculateSquareResult;
-
-_calculateSquareLabel: {
-  const _x = a;
-  const multiplier = _x;
-  _calculateSquareResult = _x * multiplier;
+  plugins: [webpackPlugin()],
 }
-
-const result = _calculateSquareResult;
 ```
 
 ## Configuration Options
 
-The plugin accepts an options object when initialized:
-
-| Option             | Type        | Default                         | Description                                                                                                                                                                  |
-|--------------------|-------------|---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `inlineIdentifier` | `string`    | `'@__INLINE__'`                 | The comment string the plugin looks for to identify functions that should be inlined. We recommend `'@__INLINE__'` to match the visual style of standard bundler directives. |
-| `allowedGlobals`   | `strring[]` | [See Defaults](src/defaults.ts) | variables/functions globally available                                                                                                                                       |
-| `fileExtensions`   | `string[]`  | [See Defaults](src/defaults.ts) | File extensions used by code files in your project                                                                                                                           |
+| Option             | Type       | Default                         | Description                                                                                                                                                                                        |
+|--------------------|------------|---------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `inlineIdentifier` | `string`   | `'@__INLINE__'`                 | The comment string used to mark functions for inlining. Both block (`/* @__INLINE__ */`) and line (`// @__INLINE__`) styles are supported. Customise to match your project's existing conventions. |
+| `allowedGlobals`   | `string[]` | [See Defaults](src/defaults.ts) | Global identifiers available inside inlined functions.                                                                                                                                             |
+| `fileExtensions`   | `string[]` | [See Defaults](src/defaults.ts) | File extensions the plugin will process.                                                                                                                                                           |
 
 ## ⚠️ Requirements
 
 A function must be pure to be inlinable. The plugin enforces strict AST analysis and will throw build errors if you
 violate any of the following rules:
 
-An inlined function must act as if every call to it could be correctly marked with `/*@__PURE__*/`
+- **No async or generators** — `async`/`await` and `function*` alter execution timing.
+- **No `this` or `arguments`** — both bind to the caller after inlining, producing unpredictable results.
+- **No outer scope mutations** — cannot reassign variables declared outside the function's own block.
+- **No outer scope references** — cannot read variables from an outer scope. Standard globals (`Math`, `JSON`, etc.) are
+  permitted — see `allowedGlobals` for the full default list.
+- **No recursive functions** — recursion cannot be unrolled at the call site.
+- **No call expressions in conditionals** — the function must be called as a standalone statement or direct assignment,
+  not inside a ternary or `if` condition. Assign the result first:
 
-* **No Async or Generators:** `async`/`await` and `function*` alter execution timing and cannot be safely inlined into
-  synchronous blocks.
-* **No `this` or `arguments`:** The dynamic context of `this` and the `arguments` object will bind to the caller,
-  resulting in unpredictable behavior.
-* **No Outer Scope Mutations:** Inlined functions cannot reassign variables declared outside of their own block scope.
-* **No Outer Scope References:** Inlined functions cannot use any outer references. Standard globals are ok like `Math`.
-* **No Caller Expressions:** You cannot call an inlined function inside complex conditional expressions (like ternaries
-  or `if (inlineFn())`). It must be called as a standalone statement or a direct variable assignment.
-* **Recursive Functions:** A recursive function cannot be inlined
+```js
+// ❌ not allowed
+if (processValue(x) > 100) { // ...
+}
+const y = isReady ? processValue(x) : 0
 
-For more info on `/*@__PURE__*/` See:
+// ✅ assign first, then use
+const processed = processValue(x)
+if (processed > 100) { // ...
+}
+const y = isReady ? processed : 0
+```
 
-* https://rollupjs.org/configuration-options/#pure
-* https://rollupjs.org/configuration-options/#no-side-effects
-* https://terser.org/docs/miscellaneous/#annotations
+For more on `/*@__PURE__*/` see:
+
+- https://rollupjs.org/configuration-options/#pure
+- https://terser.org/docs/miscellaneous/#annotations
 
 ## Releases Automation
 
