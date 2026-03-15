@@ -121,7 +121,7 @@ describe('Validation Guardrails (Bailouts)', () => {
 
   it('should throw an error when used in a short-circuiting expression', async () => {
     let caughtError: any
-    const fixturePath = path.join(fixturesDir, 'short-circuit.ts')
+    const fixturePath = path.join(fixturesDir, 'short-circuit-bailout.ts')
 
     try {
       await bundleAndRunSilent(fixturePath)

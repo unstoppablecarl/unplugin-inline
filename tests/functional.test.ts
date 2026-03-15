@@ -53,7 +53,7 @@ describe('Functional Tests: Execution and Logic', () => {
 
   it('should report a structured error for directly recursive functions', async () => {
     let caughtError: any
-    const fixturePath = path.join(fixturesDir, 'recursive-function.ts')
+    const fixturePath = path.join(fixturesDir, 'recursive-function-bailout.ts')
 
     try {
       await bundleAndRunSilent(fixturePath)
