@@ -7,6 +7,7 @@ import path from 'node:path'
 import { createUnplugin } from 'unplugin'
 import type { FileResolver, InlinePluginOptions, ResolvedImport } from './_types'
 import { FILE_EXTENSIONS, STANDARD_GLOBALS } from './defaults'
+import { normalizePath } from './lib/_helpers'
 import { type ErrorManager, makeErrorManager } from './lib/ErrorManager'
 import { executeInlining } from './lib/executeInlining'
 import { findInlineCandidates } from './lib/findInlineCandidates'
@@ -37,9 +38,10 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
     },
     watchChange(id) {
       const cleanId = id.split('?')[0]
-      globalVisitedFiles.delete(cleanId)
+      const path = normalizePath(cleanId)
+      globalVisitedFiles.delete(path)
 
-      inlineRegistry.clearFile(cleanId)
+      inlineRegistry.clearFile(path)
     },
     async transform(this: any, code: string, id: string) {
       const cleanId = id.split('?')[0]
@@ -59,31 +61,28 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
       }
 
       const greedyProcessFile = async (targetPath: string) => {
-        if (globalVisitedFiles.has(targetPath)) return
-        globalVisitedFiles.add(targetPath)
+        const normTarget = normalizePath(targetPath)
+        if (globalVisitedFiles.has(normTarget)) return
+        globalVisitedFiles.add(normTarget)
 
-        try {
-          const fileCode = await fs.promises.readFile(targetPath, 'utf-8')
-          const fileAst = parse(fileCode, {
-            sourceType: 'module',
-            plugins: ['typescript'],
-          })
-          const errMgr = makeErrorManager(targetPath)
+        const fileCode = await fs.promises.readFile(targetPath, 'utf-8')
+        const fileAst = parse(fileCode, {
+          sourceType: 'module',
+          plugins: ['typescript'],
+        })
+        const errMgr = makeErrorManager(targetPath)
 
-          const {
-            candidatesInFile,
-            importMap,
-          } = await findInlineCandidates(targetPath, opts, fileAst, resolver, inlineRegistry, greedyProcessFile)
+        const {
+          candidatesInFile,
+          importMap,
+        } = await findInlineCandidates(targetPath, opts, fileAst, resolver, inlineRegistry, greedyProcessFile)
 
-          for (const { nodePath, normalizedName } of candidatesInFile) {
-            const isValid = validateFunctionForInlining(targetPath, opts, nodePath, errMgr, importMap, inlineRegistry)
-            if (!isValid) inlineRegistry.delete(targetPath, normalizedName)
-          }
-
-          flattenInlinedFunctions(targetPath, opts, candidatesInFile, inlineRegistry)
-        } catch (e) {
-          // Ignore unreadable files (e.g. built-in node modules)
+        for (const { nodePath, normalizedName } of candidatesInFile) {
+          const isValid = validateFunctionForInlining(targetPath, opts, nodePath, errMgr, importMap, inlineRegistry)
+          if (!isValid) inlineRegistry.delete(targetPath, normalizedName)
         }
+
+        flattenInlinedFunctions(targetPath, opts, candidatesInFile, inlineRegistry)
       }
 
       // 1. PHASE 1: Discovery

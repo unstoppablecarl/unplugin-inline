@@ -1,4 +1,4 @@
-import { normalize } from 'node:path'
+import { normalizePath } from 'vite'
 import type { InlineTarget } from '../_types'
 
 export type InlineRegistry = ReturnType<typeof makeInlineRegistry>
@@ -7,8 +7,6 @@ export type FilePath = string
 
 export function makeInlineRegistry() {
   const registry = new Map<FilePath, Map<FunctionName, InlineTarget>>()
-
-  const normalizePath = (file: string) => normalize(file).replace(/\\/g, '/')
 
   return {
     set(file: string, functionName: string, target: InlineTarget) {
