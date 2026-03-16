@@ -2,36 +2,42 @@
 
 AST-driven unplugin that inlines pure functions at build time across Vite, Rollup, Webpack, and esbuild.
 
+---
+
 ## Why
 
-V8 refuses to inline functions whose bytecode exceeds ~460 instructions, even on the hot path — every call still pays
-full frame setup cost at runtime. Marking a function with `/* @__INLINE__ */` moves that cost to build time instead.
+V8 refuses to inline functions whose bytecode exceeds ~460 instructions or ~600 bytes, even on the hot path—every call still pays full frame
+setup cost at runtime. Marking a function with `/* @__INLINE__ */` moves that cost to build time instead, flattening the
+logic directly into the caller.
 
 ## Installation
 
 ```bash
+pnpm add -D unplugin-inline
+# or
 npm install -D unplugin-inline
 # or
 yarn add -D unplugin-inline
-# or
-pnpm add -D unplugin-inline
 ```
 
-## Usage
+## Example Usage
 
 Consider a physics simulation where `transformPoint` is called millions of times per frame. The function is large enough
-that V8 refuses to inline it automatically, so every call pays full frame setup cost at runtime.
+that V8 refuses to inline it automatically.
+
+### Source Code
 
 **`src/physics.ts`**
 
 ```ts
 /* @__INLINE__ */
 function transformPoint(x: number, y: number, z: number, matrix: Float32Array): number {
-  const tx = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12]
-  const ty = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13]
-  const tz = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]
-  const tw = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15]
-  
+  const m = matrix;
+  const tx = m[0] * x + m[4] * y + m[8] * z + m[12]
+  const ty = m[1] * x + m[5] * y + m[9] * z + m[13]
+  const tz = m[2] * x + m[6] * y + m[10] * z + m[14]
+  const tw = m[3] * x + m[7] * y + m[11] * z + m[15]
+
   return Math.sqrt(tx * tx + ty * ty + tz * tz) / tw
 }
 
@@ -44,6 +50,8 @@ export function processVertices(vertices: Float32Array, matrix: Float32Array): n
   return sum
 }
 ```
+
+### Compiled Output
 
 The compiled output has no `transformPoint` declaration. Its body is placed directly at the call site as a flat labeled
 block:
@@ -72,11 +80,13 @@ function processVertices(vertices, matrix) {
 }
 ```
 
-Both block (`/* @__INLINE__ */`) and line (`// @__INLINE__`) comment styles are recognised.
+*Both block (`/* @__INLINE__ */`) and line (`// @__INLINE__`) comment styles are recognized.*
 
 ## Bundler Configuration
 
-**Vite** — `vite.config.ts`
+### Vite
+
+**`vite.config.ts`**
 
 ```ts
 import { defineConfig } from 'vite'
@@ -87,7 +97,9 @@ export default defineConfig({
 })
 ```
 
-**esbuild** — `build.js`
+### esbuild
+
+**`build.js`**
 
 ```js
 import esbuild from 'esbuild'
@@ -100,25 +112,47 @@ esbuild.build({
 })
 ```
 
-**tsup** — `tsup.config.ts`
+### tsup (Advanced)
+
+`tsup` uses **esbuild** for high-speed transpilation but switches to **Rollup** internally for generating declaration
+files (`.d.ts`).
+
+#### 1. Dual-Engine Configuration
+
+To ensure code is inlined in both your JavaScript and your types, register the plugin in both slots:
+
 ```ts
 import { defineConfig } from 'tsup'
 import { esbuildPlugin, rollupPlugin } from 'unplugin-inline'
 
 export default defineConfig({
-  esbuildPlugins: [
-    esbuildPlugin()
-  ],
+  esbuildPlugins: [esbuildPlugin()], // For JS/TS (esbuild)
   rollup: {
-    plugins: [
-      rollupPlugin()
-    ]
+    plugins: [rollupPlugin()]        // For types (Rollup)
   }
 })
 ```
 
+#### 2. Avoiding `DataCloneError`
 
-**Rollup** — `rollup.config.js`
+If using an **array-based configuration**, `tsup` parallelizes tasks using worker threads. Because functions cannot be
+cloned across threads, you must **instantiate the plugin inside each config block**.
+
+> **Rule of Thumb:** Never call `esbuildPlugin()` in the global scope of an array-based config.
+
+**✅ Correct Pattern:**
+
+```ts
+export default defineConfig([
+  { esbuildPlugins: [esbuildPlugin()] }, // Fresh instance
+  { esbuildPlugins: [esbuildPlugin()] }  // Fresh instance
+])
+
+```
+
+### Rollup
+
+**`rollup.config.js`**
 
 ```js
 import { rollupPlugin } from 'unplugin-inline'
@@ -127,9 +161,12 @@ export default {
   input: 'input.js',
   plugins: [rollupPlugin()],
 }
+
 ```
 
-**Webpack** — `webpack.config.js`
+### Webpack
+
+**`webpack.config.js`**
 
 ```js
 const { webpackPlugin } = require('unplugin-inline')
@@ -141,16 +178,16 @@ module.exports = {
 
 ## Configuration Options
 
-| Option             | Type       | Default                         | Description                                                                                                                                                                                        |
-|--------------------|------------|---------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `inlineIdentifier` | `string`   | `'@__INLINE__'`                 | The comment string used to mark functions for inlining. Both block (`/* @__INLINE__ */`) and line (`// @__INLINE__`) styles are supported. Customise to match your project's existing conventions. |
-| `allowedGlobals`   | `string[]` | [See Defaults](src/defaults.ts) | Global identifiers available inside inlined functions.                                                                                                                                             |
-| `fileExtensions`   | `string[]` | [See Defaults](src/defaults.ts) | File extensions the plugin will process.                                                                                                                                                           |
+| Option             | Type       | Default                                                         | Description                                            |
+|--------------------|------------|-----------------------------------------------------------------|--------------------------------------------------------|
+| `inlineIdentifier` | `string`   | `'@__INLINE__'`                                                 | The comment string used to mark functions.             |
+| `allowedGlobals`   | `string[]` | [See Defaults](https://www.google.com/search?q=src/defaults.ts) | Global identifiers available inside inlined functions. |
+| `fileExtensions`   | `string[]` | [See Defaults](https://www.google.com/search?q=src/defaults.ts) | File extensions the plugin will process.               |
 
-## ⚠️ Requirements
+## ⚠️ Requirements & Restrictions
 
-A function must be pure to be inlinable. The plugin enforces strict AST analysis and will throw build errors if you
-violate any of the following rules:
+A function must be **pure** to be inlinable. The plugin enforces strict AST analysis and will throw build errors if you
+violate these rules:
 
 - **No async or generators** — `async`/`await` and `function*` alter execution timing.
 - **No `this` or `arguments`** — both bind to the caller after inlining, producing unpredictable results.
@@ -162,22 +199,15 @@ violate any of the following rules:
   not inside a ternary or `if` condition. Assign the result first:
 
 ```js
-// ❌ not allowed
+// ❌ Not allowed
 if (processValue(x) > 100) { // ...
 }
-const y = isReady ? processValue(x) : 0
 
-// ✅ assign first, then use
+// ✅ Assign first, then use
 const processed = processValue(x)
 if (processed > 100) { // ...
 }
-const y = isReady ? processed : 0
 ```
-
-For more on `/*@__PURE__*/` see:
-
-- https://rollupjs.org/configuration-options/#pure
-- https://terser.org/docs/miscellaneous/#annotations
 
 ## Benchmarks
 
@@ -185,7 +215,7 @@ For more on `/*@__PURE__*/` see:
 npm run bench
 ```
 
-## Releases Automation
+## Release Automation
 
 * update `package.json` file version (example: `1.0.99`)
 * manually create a github release with a tag matching the `package.json` version prefixed with `v` (example: `v1.0.99`)
