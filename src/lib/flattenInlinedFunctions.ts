@@ -82,15 +82,17 @@ export function getSortedOrder(
     if (!candidate) return
 
     if (recStack.has(name)) {
-      const err = makeErrorManager(id)
-      const cyclePath = [...recStack, name].join(' -> ')
+      const stackArr = [...recStack]
+      const cycleStart = stackArr.indexOf(name)
+      const cyclePath = [...stackArr.slice(cycleStart), name].join(' -> ')
 
+      const err = makeErrorManager(id)
       // We pass the actual AST node of the function declaration to the error manager
       err.recordError(
         `Circular dependency detected in @__INLINE__ functions: ${cyclePath}`,
         candidate.nodePath.node,
       )
-      throw err.makeValidationError()
+      throw err.makeUsageError()
     }
 
     if (visited.has(name)) return
