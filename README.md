@@ -87,7 +87,7 @@ export default defineConfig({
 })
 ```
 
-**esbuild / tsup** — `build.js`
+**esbuild** — `build.js`
 
 ```js
 import esbuild from 'esbuild'
@@ -99,6 +99,22 @@ esbuild.build({
   plugins: [esbuildPlugin()],
 })
 ```
+
+**tsup** — `tsup.config.ts`
+```ts
+import { defineConfig } from 'tsup'
+import { esbuildPlugin, rollupPlugin } from 'unplugin-inline'
+
+export default defineConfig({
+  plugins: [esbuildPlugin()],
+  rollup: {
+    plugins: [
+      rollupPlugin()
+    ]
+  }
+})
+```
+
 
 **Rollup** — `rollup.config.js`
 
