@@ -18,11 +18,8 @@ describe('Validation Guardrails (Bailouts)', () => {
     }
 
     expect(caughtError, 'expected error to be thrown').toBeDefined()
-
     expect(caughtError.errors).toBeDefined()
-
-    const firstError = caughtError.errors[0]
-    const errorText = firstError.text
+    const errorText = caughtError.errors[0].text
 
     expect(errorText).toContain('Validation failed')
     expect(errorText).toContain(`Cannot inline function 'doAsync': async functions are not supported.`)
@@ -40,9 +37,8 @@ describe('Validation Guardrails (Bailouts)', () => {
     }
 
     expect(caughtError, 'expected error to be thrown').toBeDefined()
-
-    const firstError = caughtError.errors[0]
-    const errorText = firstError.text
+    expect(caughtError.errors).toBeDefined()
+    const errorText = caughtError.errors[0].text
 
     expect(errorText).toContain(`Cannot inline function 'doGen': generator functions are not supported.`)
   })
@@ -58,9 +54,8 @@ describe('Validation Guardrails (Bailouts)', () => {
     }
 
     expect(caughtError, 'expected error to be thrown').toBeDefined()
-
-    const firstError = caughtError.errors[0]
-    const errorText = firstError.text
+    expect(caughtError.errors).toBeDefined()
+    const errorText = caughtError.errors[0].text
 
     expect(errorText).toContain('Cannot inline function \'useThis\': uses \'this\' keyword.')
   })
@@ -76,9 +71,8 @@ describe('Validation Guardrails (Bailouts)', () => {
     }
 
     expect(caughtError, 'expected error to be thrown').toBeDefined()
-
-    const firstError = caughtError.errors[0]
-    const errorText = firstError.text
+    expect(caughtError.errors).toBeDefined()
+    const errorText = caughtError.errors[0].text
 
     expect(errorText).toContain('Cannot inline function \'useArgs\': uses \'arguments\' keyword.')
   })
@@ -94,9 +88,8 @@ describe('Validation Guardrails (Bailouts)', () => {
     }
 
     expect(caughtError, 'expected error to be thrown').toBeDefined()
-
-    const firstError = caughtError.errors[0]
-    const errorText = firstError.text
+    expect(caughtError.errors).toBeDefined()
+    const errorText = caughtError.errors[0].text
 
     expect(errorText).toContain('Cannot inline function \'mutateOuter\': mutates outer scope variable \'outerState\'.')
   })
@@ -112,9 +105,8 @@ describe('Validation Guardrails (Bailouts)', () => {
     }
 
     expect(caughtError, 'expected error to be thrown').toBeDefined()
-
-    const firstError = caughtError.errors[0]
-    const errorText = firstError.text
+    expect(caughtError.errors).toBeDefined()
+    const errorText = caughtError.errors[0].text
 
     expect(errorText).toContain('Cannot inline function \'updateOuter\': mutates outer scope variable \'counter\'.')
   })
@@ -130,8 +122,60 @@ describe('Validation Guardrails (Bailouts)', () => {
     }
 
     expect(caughtError, 'expected error to be thrown').toBeDefined()
+    expect(caughtError.errors).toBeDefined()
     const errorText = caughtError.errors[0].text
 
     expect(errorText).toContain('Cannot inline function \'getOne\': used in short-circuiting expression.')
+  })
+
+  it('should throw an error when a circular dependency is found.', async () => {
+    let caughtError: any
+    const fixturePath = path.join(fixturesDir, 'circular-dependency-bailout.ts')
+
+    try {
+      await bundleAndRunSilent(fixturePath)
+    } catch (error) {
+      caughtError = error
+    }
+
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
+    expect(caughtError.errors).toBeDefined()
+    const errorText = caughtError.errors[0].text
+
+    expect(errorText).toContain(`Circular dependency detected in @__INLINE__ functions: addA -> addB -> addA`)
+  })
+
+  it('should throw an error when a circular dependency chain is found.', async () => {
+    let caughtError: any
+    const fixturePath = path.join(fixturesDir, 'circular-dependency-chain-bailout.ts')
+
+    try {
+      await bundleAndRunSilent(fixturePath)
+    } catch (error) {
+      caughtError = error
+    }
+
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
+    expect(caughtError.errors).toBeDefined()
+    const errorText = caughtError.errors[0].text
+
+    expect(errorText).toContain(`Circular dependency detected in @__INLINE__ functions: addA -> addB -> addC -> addA`)
+  })
+
+  it('should throw an error when entering a circular dependency chain is found.', async () => {
+    let caughtError: any
+    const fixturePath = path.join(fixturesDir, 'circular-dependency-entry-bailout.ts')
+
+    try {
+      await bundleAndRunSilent(fixturePath)
+    } catch (error) {
+      caughtError = error
+    }
+
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
+    expect(caughtError.errors).toBeDefined()
+    const errorText = caughtError.errors[0].text
+
+    expect(errorText).toContain(`Circular dependency detected in @__INLINE__ functions: cycleA -> cycleB -> cycleA`)
   })
 })

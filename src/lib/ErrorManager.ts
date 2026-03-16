@@ -1,6 +1,7 @@
 import * as t from '@babel/types'
 
 export type ErrorManager = ReturnType<typeof makeErrorManager>
+
 export function makeErrorManager(id: string) {
   const errors: string[] = []
 
@@ -32,6 +33,6 @@ export function makeErrorManager(id: string) {
     errors,
     recordError,
     makeValidationError,
-    makeUsageError
+    makeUsageError,
   }
 }
