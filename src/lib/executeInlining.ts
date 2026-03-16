@@ -53,7 +53,7 @@ export function executeInlining(
   const argDecls = []
   if (dummyFunc.params.length > 0 || callerArgs.length > 0) {
     argDecls.push(
-      t.variableDeclaration('const', [
+      t.variableDeclaration('let', [
         t.variableDeclarator(
           t.arrayPattern(dummyFunc.params as any),
           t.arrayExpression(callerArgs),
