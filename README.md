@@ -112,42 +112,17 @@ esbuild.build({
 })
 ```
 
-### tsup (Advanced)
+### tsup
 
-`tsup` uses **esbuild** for high-speed transpilation but switches to **Rollup** internally for generating declaration
-files (`.d.ts`).
-
-#### 1. Dual-Engine Configuration
-
-To ensure code is inlined in both your JavaScript and your types, register the plugin in both slots:
+**`tsup.config.ts`**
 
 ```ts
 import { defineConfig } from 'tsup'
-import { esbuildPlugin, rollupPlugin } from 'unplugin-inline'
+import { esbuildPlugin } from 'unplugin-inline'
 
 export default defineConfig({
-  esbuildPlugins: [esbuildPlugin()], // For JS/TS (esbuild)
-  rollup: {
-    plugins: [rollupPlugin()]        // For types (Rollup)
-  }
+  esbuildPlugins: [esbuildPlugin()],
 })
-```
-
-#### 2. Avoiding `DataCloneError`
-
-If using an **array-based configuration**, `tsup` parallelizes tasks using worker threads. Because functions cannot be
-cloned across threads, you must **instantiate the plugin inside each config block**.
-
-> **Rule of Thumb:** Never call `esbuildPlugin()` in the global scope of an array-based config.
-
-**✅ Correct Pattern:**
-
-```ts
-export default defineConfig([
-  { esbuildPlugins: [esbuildPlugin()] }, // Fresh instance
-  { esbuildPlugins: [esbuildPlugin()] }  // Fresh instance
-])
-
 ```
 
 ### Rollup
