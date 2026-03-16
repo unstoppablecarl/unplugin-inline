@@ -31,6 +31,7 @@ function transformPoint(x: number, y: number, z: number, matrix: Float32Array): 
   const ty = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13]
   const tz = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]
   const tw = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15]
+  
   return Math.sqrt(tx * tx + ty * ty + tz * tz) / tw
 }
 
