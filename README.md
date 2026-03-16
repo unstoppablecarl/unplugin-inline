@@ -106,7 +106,9 @@ import { defineConfig } from 'tsup'
 import { esbuildPlugin, rollupPlugin } from 'unplugin-inline'
 
 export default defineConfig({
-  plugins: [esbuildPlugin()],
+  esbuildPlugins: [
+    esbuildPlugin()
+  ],
   rollup: {
     plugins: [
       rollupPlugin()
