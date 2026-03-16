@@ -161,6 +161,12 @@ For more on `/*@__PURE__*/` see:
 - https://rollupjs.org/configuration-options/#pure
 - https://terser.org/docs/miscellaneous/#annotations
 
+## Benchmarks
+
+```bash
+npm run bench
+```
+
 ## Releases Automation
 
 * update `package.json` file version (example: `1.0.99`)

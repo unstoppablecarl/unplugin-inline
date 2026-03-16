@@ -5,11 +5,11 @@ export type BenchProcess = {
   runtime: (args: any[]) => any
 }
 
-export type ArgGenerator = () => any
+export type ArgsGenerator = () => any[]
 
 export type CaseCallback = (opts: {
   file: string
   standard: BenchProcess
   inlined: BenchProcess
-  args: ArgGenerator[]
+  argsGenerator: ArgsGenerator
 }) => void
