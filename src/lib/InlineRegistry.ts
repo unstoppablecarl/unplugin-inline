@@ -1,5 +1,5 @@
-import { normalizePath } from 'vite'
 import type { InlineTarget } from '../_types'
+import { normalizePath } from './_helpers'
 
 export type InlineRegistry = ReturnType<typeof makeInlineRegistry>
 export type FunctionName = string
