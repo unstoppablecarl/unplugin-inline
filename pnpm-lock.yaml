@@ -9,16 +9,16 @@ importers:
   .:
     dependencies:
       '@babel/generator':
-        specifier: ^7.24.5
+        specifier: ^7.29.1
         version: 7.29.1
       '@babel/parser':
-        specifier: ^7.24.5
+        specifier: ^7.29.0
         version: 7.29.0
       '@babel/traverse':
-        specifier: ^7.24.5
+        specifier: ^7.29.0
         version: 7.29.0
       '@babel/types':
-        specifier: ^7.24.5
+        specifier: ^7.29.0
         version: 7.29.0
       unplugin:
         specifier: ^3.0.0
@@ -28,16 +28,16 @@ importers:
         version: 5.4.21(@types/node@20.19.37)(terser@5.46.0)
       webpack:
         specifier: ^4.0.0 || ^5.0.0
-        version: 5.105.4(esbuild@0.21.5)
+        version: 5.105.4(esbuild@0.27.4)
     devDependencies:
       '@mitata/counters':
         specifier: ^0.0.8
         version: 0.0.8
       '@types/babel__generator':
-        specifier: ^7.6.8
+        specifier: ^7.27.0
         version: 7.27.0
       '@types/babel__traverse':
-        specifier: ^7.20.6
+        specifier: ^7.28.0
         version: 7.28.0
       '@types/node':
         specifier: ^20.12.12
@@ -46,8 +46,8 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(vitest@3.2.4(@types/node@20.19.37)(terser@5.46.0))
       esbuild:
-        specifier: ^0.21.3
-        version: 0.21.5
+        specifier: ^0.27.4
+        version: 0.27.4
       mitata:
         specifier: ^1.0.34
         version: 1.0.34
@@ -58,13 +58,13 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0
       tsup:
-        specifier: ^8.0.2
+        specifier: ^8.5.1
         version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
       typescript:
-        specifier: ^5.4.5
+        specifier: ^5.9.3
         version: 5.9.3
       vitest:
         specifier: ^3.2.4
@@ -2482,15 +2482,15 @@ snapshots:
 
   tapable@2.3.0: {}
 
-  terser-webpack-plugin@5.4.0(esbuild@0.21.5)(webpack@5.105.4(esbuild@0.21.5)):
+  terser-webpack-plugin@5.4.0(esbuild@0.27.4)(webpack@5.105.4(esbuild@0.27.4)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
       schema-utils: 4.3.3
       terser: 5.46.0
-      webpack: 5.105.4(esbuild@0.21.5)
+      webpack: 5.105.4(esbuild@0.27.4)
     optionalDependencies:
-      esbuild: 0.21.5
+      esbuild: 0.27.4
 
   terser@5.46.0:
     dependencies:
@@ -2662,7 +2662,7 @@ snapshots:
 
   webpack-virtual-modules@0.6.2: {}
 
-  webpack@5.105.4(esbuild@0.21.5):
+  webpack@5.105.4(esbuild@0.27.4):
     dependencies:
       '@types/eslint-scope': 3.7.7
       '@types/estree': 1.0.8
@@ -2686,7 +2686,7 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.0
-      terser-webpack-plugin: 5.4.0(esbuild@0.21.5)(webpack@5.105.4(esbuild@0.21.5))
+      terser-webpack-plugin: 5.4.0(esbuild@0.27.4)(webpack@5.105.4(esbuild@0.27.4))
       watchpack: 2.5.1
       webpack-sources: 3.3.4
     transitivePeerDependencies:
