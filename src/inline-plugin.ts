@@ -34,7 +34,7 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
     name: 'unplugin-inline',
     enforce: 'pre',
     transformInclude(id) {
-      return id.endsWith('.ts') || id.endsWith('.js')
+      return opts.fileExtensions.some(ext => id.endsWith(ext))
     },
     watchChange(id) {
       const cleanId = id.split('?')[0]
@@ -48,6 +48,7 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
       const ast = parse(code, { sourceType: 'module', plugins: ['typescript'] })
       const errorManager = makeErrorManager(cleanId)
 
+      console.log(id)
       let resolver: FileResolver
 
       // Try Rollup/Vite's native resolver if available
