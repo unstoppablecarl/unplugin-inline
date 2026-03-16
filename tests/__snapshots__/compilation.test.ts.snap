@@ -3,7 +3,7 @@
 exports[`Compilation Tests: Code Transformation > should allow custom inline identifier > fixtures/custom-identifier.ts 1`] = `
 "let _subtractResult;
 _subtractLabel: {
-  const [_arg_a, _arg_b] = [10, 5];
+  let [_arg_a, _arg_b] = [10, 5];
   _subtractResult = _arg_a - _arg_b;
   break _subtractLabel;
 }
@@ -19,7 +19,7 @@ exports[`Compilation Tests: Code Transformation > should correct loop scoping wh
 for (let i = 0; i < 3; i++) {
   let _squareResult;
   _squareLabel: {
-    const [_arg_n] = [i];
+    let [_arg_n] = [i];
     const _t_res = _arg_n * _arg_n;
     _squareResult = _t_res;
     break _squareLabel;
@@ -39,7 +39,7 @@ exports[`Compilation Tests: Code Transformation > should handle functions with n
 };
 let _doSomethingResult;
 _doSomethingLabel: {
-  const [_arg_obj] = [input];
+  let [_arg_obj] = [input];
   _arg_obj.a += 1;
   _doSomethingResult = void 0;
   break _doSomethingLabel;
@@ -56,7 +56,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should handle multiple return statements > fixtures/early-return.ts 1`] = `
 "let _isPositiveResult;
 _isPositiveLabel: {
-  const [_arg_n] = [10];
+  let [_arg_n] = [10];
   if (_arg_n > 0) {
     _isPositiveResult = true;
     break _isPositiveLabel;
@@ -67,7 +67,7 @@ _isPositiveLabel: {
 const pos = _isPositiveResult;
 let _isPositiveResult2;
 _isPositiveLabel2: {
-  const [_arg_n] = [-5];
+  let [_arg_n] = [-5];
   if (_arg_n > 0) {
     _isPositiveResult2 = true;
     break _isPositiveLabel2;
@@ -90,7 +90,7 @@ function inc() {
 }
 let _multiplyResult;
 _multiplyLabel: {
-  const [_arg_a, _arg_b] = [inc(), inc()];
+  let [_arg_a, _arg_b] = [inc(), inc()];
   _multiplyResult = _arg_a * _arg_b;
   break _multiplyLabel;
 }
@@ -106,7 +106,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should inline a simple arrow function returning a literal > fixtures/simple-add-arrow.ts 1`] = `
 "let _addResult;
 _addLabel: {
-  const [_arg_a, _arg_b] = [5, 10];
+  let [_arg_a, _arg_b] = [5, 10];
   _addResult = _arg_a + _arg_b;
   break _addLabel;
 }
@@ -120,7 +120,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should inline a simple function returning a literal > fixtures/simple-add.ts 1`] = `
 "let _addResult;
 _addLabel: {
-  const [_arg_a, _arg_b] = [10, 20];
+  let [_arg_a, _arg_b] = [10, 20];
   _addResult = _arg_a + _arg_b;
   break _addLabel;
 }
@@ -134,7 +134,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should inline cross-file arrow functions and clean up unexported ones > fixtures/import-arrow.ts 1`] = `
 "let _exportedArrowAddResult;
 _exportedArrowAddLabel: {
-  const [_arg_a, _arg_b] = [10, 20];
+  let [_arg_a, _arg_b] = [10, 20];
   _exportedArrowAddResult = _arg_a + _arg_b;
   break _exportedArrowAddLabel;
 }
@@ -143,7 +143,7 @@ let _useInternalResult;
 _useInternalLabel: {
   let _t__internalMultiplierResult;
   _internalMultiplierLabel: {
-    const [_t__arg_x, _t__arg_y] = [5, 10];
+    let [_t__arg_x, _t__arg_y] = [5, 10];
     _t__internalMultiplierResult = _t__arg_x * _t__arg_y;
     break _internalMultiplierLabel;
   }
@@ -190,19 +190,19 @@ exports[`Compilation Tests: Code Transformation > should work on deep nested fun
 "const run = (val) => {
   let _level5Result2;
   _level5Label2: {
-    const [_arg_val] = [val];
+    let [_arg_val] = [val];
     let _t__level4Result;
     _level4Label: {
-      const [_t__arg_val2] = [_arg_val];
+      let [_t__arg_val2] = [_arg_val];
       let _t__t__level3Result;
       _level3Label: {
-        const [_t__t__arg_val] = [_t__arg_val2];
+        let [_t__t__arg_val] = [_t__arg_val2];
         let _t__t__t__level2Result;
         _level2Label: {
-          const [_t__t__t__arg_val2] = [_t__t__arg_val];
+          let [_t__t__t__arg_val2] = [_t__t__arg_val];
           let _t__t__t__t__level1Result;
           _level1Label: {
-            const [_t__t__t__t__arg_val] = [_t__t__t__arg_val2];
+            let [_t__t__t__t__arg_val] = [_t__t__t__arg_val2];
             _t__t__t__t__level1Result = _t__t__t__t__arg_val + 1;
             break _level1Label;
           }
@@ -229,7 +229,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on default parameters > fixtures/default-params.ts 1`] = `
 "let _defaultAddResult;
 _defaultAddLabel: {
-  const [_arg_a, _arg_b = 10] = [5];
+  let [_arg_a, _arg_b = 10] = [5];
   _defaultAddResult = _arg_a + _arg_b;
   break _defaultAddLabel;
 }
@@ -243,7 +243,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on global function dependencies > fixtures/math-global.ts 1`] = `
 "let _sqrtResult;
 _sqrtLabel: {
-  const [_arg_a] = [24];
+  let [_arg_a] = [24];
   _sqrtResult = Math.sqrt(_arg_a);
   break _sqrtLabel;
 }
@@ -257,7 +257,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on imported inlined functions > fixtures/imported-function.ts 1`] = `
 "let _exportedAddResult;
 _exportedAddLabel: {
-  const [_arg_a, _arg_b] = [1, 2];
+  let [_arg_a, _arg_b] = [1, 2];
   _exportedAddResult = _arg_a + _arg_b;
   break _exportedAddLabel;
 }
@@ -271,7 +271,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on missing arguments > fixtures/missing-arguments.ts 1`] = `
 "let _addOptionalResult;
 _addOptionalLabel: {
-  const [_arg_a, _arg_b] = [10];
+  let [_arg_a, _arg_b] = [10];
   _addOptionalResult = _arg_b === void 0 ? _arg_a : _arg_a + _arg_b;
   break _addOptionalLabel;
 }
@@ -285,19 +285,19 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on multiple inline calls in a single statement > fixtures/multiple-calls-on-one-line.ts 1`] = `
 "let _addResult;
 _addLabel: {
-  const [_arg_a, _arg_b] = [10, 20];
+  let [_arg_a, _arg_b] = [10, 20];
   _addResult = _arg_a + _arg_b;
   break _addLabel;
 }
 let _addResult2;
 _addLabel2: {
-  const [_arg_a, _arg_b] = [5, 5];
+  let [_arg_a, _arg_b] = [5, 5];
   _addResult2 = _arg_a + _arg_b;
   break _addLabel2;
 }
 let _addResult3;
 _addLabel3: {
-  const [_arg_a, _arg_b] = [1, 2];
+  let [_arg_a, _arg_b] = [1, 2];
   _addResult3 = _arg_a + _arg_b;
   break _addLabel3;
 }
@@ -311,10 +311,10 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on nested function calls > fixtures/nested-inline-calls.ts 1`] = `
 "let _quadrupleResult;
 _quadrupleLabel: {
-  const [_arg_n2] = [10];
+  let [_arg_n2] = [10];
   let _t__doubleResult;
   _doubleLabel: {
-    const [_t__arg_n] = [_arg_n2];
+    let [_t__arg_n] = [_arg_n2];
     _t__doubleResult = _t__arg_n * 2;
     break _doubleLabel;
   }
@@ -331,7 +331,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on nested functions > fixtures/nested-function.ts 1`] = `
 "let _withNestedResult;
 _withNestedLabel: {
-  const [_arg_val] = [5];
+  let [_arg_val] = [5];
   const _t_innerAdder = (x) => {
     return x + _arg_val;
   };
@@ -348,7 +348,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on parameter destructuring > fixtures/destructuring-params.ts 1`] = `
 "let _objAddResult;
 _objAddLabel: {
-  const [{
+  let [{
     a: _arg_a,
     b: _arg_b
   }] = [{
@@ -368,7 +368,7 @@ export {
 exports[`Compilation Tests: Code Transformation > should work on plain JS files (without TS syntax) > fixtures/plain-js.js 1`] = `
 "let _multiplyResult;
 _multiplyLabel: {
-  const [_arg_a, _arg_b] = [2, 3];
+  let [_arg_a, _arg_b] = [2, 3];
   _multiplyResult = _arg_a * _arg_b;
   break _multiplyLabel;
 }
