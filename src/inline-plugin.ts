@@ -48,7 +48,6 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
       const ast = parse(code, { sourceType: 'module', plugins: ['typescript'] })
       const errorManager = makeErrorManager(cleanId)
 
-      console.log(id)
       let resolver: FileResolver
 
       // Try Rollup/Vite's native resolver if available
