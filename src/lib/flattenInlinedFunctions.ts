@@ -18,8 +18,22 @@ export function flattenInlinedFunctions(
 
   for (const name of sortedNames) {
     const target = inlineRegistry.get(id, name)
-    if (!target || !target.body) continue
 
+    if (!target || !target.body) {
+      const err = makeErrorManager(id)
+      err.recordError(
+        `Internal Error: Blueprint for '${name}' was not found or is empty.`,
+        candidatesInFile.find(({ nodePath }) => {
+          const p = nodePath
+          return (t.isFunctionDeclaration(p.node) && p.node.id?.name === name) ||
+            (t.isVariableDeclarator(p.node) && t.isIdentifier((p.node as any).id) && (p.node as any).id.name === name)
+        })?.nodePath?.node, // Safely fall back to undefined if not found
+      )
+      throw err.makeValidationError()
+    }
+
+    // Wrap the blueprint body in a temporary file/program
+    // This gives Babel the necessary scope structures to perform renames
     const tempFile = t.file(t.program([...t.cloneNode(target.body).body]))
 
     traverse(tempFile, {

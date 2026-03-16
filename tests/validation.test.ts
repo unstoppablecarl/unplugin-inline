@@ -149,4 +149,19 @@ describe('Validation Guardrails (Bailouts)', () => {
     const errorText = caughtError.errors[0].text
     expect(errorText).toContain(`Circular dependency detected in @__INLINE__ functions: addA -> addB -> addA`)
   })
+
+  it('should throw an error when a circular dependency chain is found.', async () => {
+    let caughtError: any
+    const fixturePath = path.join(fixturesDir, 'circular-dependency-chain-bailout.ts')
+
+    try {
+      await bundleAndRunSilent(fixturePath)
+    } catch (error) {
+      caughtError = error
+    }
+
+    expect(caughtError, 'expected error to be thrown').toBeDefined()
+    const errorText = caughtError.errors[0].text
+    expect(errorText).toContain(`Circular dependency detected in @__INLINE__ functions: addA -> addB -> addC -> addA`)
+  })
 })
