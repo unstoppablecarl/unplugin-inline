@@ -62,27 +62,40 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
 
       const greedyProcessFile = async (targetPath: string) => {
         const normTarget = normalizePath(targetPath)
+
+        const ext = path.extname(normTarget)
+        if (!opts.fileExtensions.includes(ext)) return
+
         if (globalVisitedFiles.has(normTarget)) return
         globalVisitedFiles.add(normTarget)
 
-        const fileCode = await fs.promises.readFile(targetPath, 'utf-8')
-        const fileAst = parse(fileCode, {
-          sourceType: 'module',
-          plugins: ['typescript'],
-        })
-        const errMgr = makeErrorManager(targetPath)
+        try {
+          const fileCode = await fs.promises.readFile(targetPath, 'utf-8')
+          const fileAst = parse(fileCode, {
+            sourceType: 'module',
+            plugins: ['typescript'],
+          })
+          const errMgr = makeErrorManager(targetPath)
 
-        const {
-          candidatesInFile,
-          importMap,
-        } = await findInlineCandidates(targetPath, opts, fileAst, resolver, inlineRegistry, greedyProcessFile)
+          const {
+            candidatesInFile,
+            importMap,
+          } = await findInlineCandidates(targetPath, opts, fileAst, resolver, inlineRegistry, greedyProcessFile)
 
-        for (const { nodePath, normalizedName } of candidatesInFile) {
-          const isValid = validateFunctionForInlining(targetPath, opts, nodePath, errMgr, importMap, inlineRegistry)
-          if (!isValid) inlineRegistry.delete(targetPath, normalizedName)
+          for (const { nodePath, normalizedName } of candidatesInFile) {
+            const isValid = validateFunctionForInlining(targetPath, opts, nodePath, errMgr, importMap, inlineRegistry)
+            if (!isValid) inlineRegistry.delete(targetPath, normalizedName)
+          }
+
+          flattenInlinedFunctions(targetPath, opts, candidatesInFile, inlineRegistry)
+        } catch (e: any) {
+          // File vanished
+          if (e.code === 'ENOENT') return
+          // Targeted a directory
+          if (e.code === 'EISDIR') return
+
+          throw e
         }
-
-        flattenInlinedFunctions(targetPath, opts, candidatesInFile, inlineRegistry)
       }
 
       // 1. PHASE 1: Discovery
