@@ -1,4 +1,4 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from 'tsup'
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -7,11 +7,4 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  esbuildOptions(options) {
-    options.banner = {
-      js: `/**
-       * @esbuild-plugin-inline-function
-       */`,
-    }
-  },
-});
+})
