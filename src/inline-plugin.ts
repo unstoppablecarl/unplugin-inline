@@ -7,6 +7,7 @@ import path from 'node:path'
 import { createUnplugin } from 'unplugin'
 import type { FileResolver, InlinePluginOptions, ResolvedImport } from './_types'
 import { FILE_EXTENSIONS, STANDARD_GLOBALS } from './defaults'
+import { normalizePath } from './lib/_helpers'
 import { type ErrorManager, makeErrorManager } from './lib/ErrorManager'
 import { executeInlining } from './lib/executeInlining'
 import { findInlineCandidates } from './lib/findInlineCandidates'
@@ -35,6 +36,13 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
     transformInclude(id) {
       return id.endsWith('.ts') || id.endsWith('.js')
     },
+    watchChange(id) {
+      const cleanId = id.split('?')[0]
+      const path = normalizePath(cleanId)
+      globalVisitedFiles.delete(path)
+
+      inlineRegistry.clearFile(path)
+    },
     async transform(this: any, code: string, id: string) {
       const cleanId = id.split('?')[0]
       const ast = parse(code, { sourceType: 'module', plugins: ['typescript'] })
@@ -53,8 +61,13 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
       }
 
       const greedyProcessFile = async (targetPath: string) => {
-        if (globalVisitedFiles.has(targetPath)) return
-        globalVisitedFiles.add(targetPath)
+        const normTarget = normalizePath(targetPath)
+
+        const ext = path.extname(normTarget)
+        if (!opts.fileExtensions.includes(ext)) return
+
+        if (globalVisitedFiles.has(normTarget)) return
+        globalVisitedFiles.add(normTarget)
 
         try {
           const fileCode = await fs.promises.readFile(targetPath, 'utf-8')
@@ -75,8 +88,13 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
           }
 
           flattenInlinedFunctions(targetPath, opts, candidatesInFile, inlineRegistry)
-        } catch (e) {
-          // Ignore unreadable files (e.g. built-in node modules)
+        } catch (e: any) {
+          // File vanished
+          if (e.code === 'ENOENT') return
+          // Targeted a directory
+          if (e.code === 'EISDIR') return
+
+          throw e
         }
       }
 
