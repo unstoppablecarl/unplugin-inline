@@ -46,7 +46,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(vitest@3.2.4(@types/node@20.19.37)(terser@5.46.0))
       esbuild:
-        specifier: ^0.27.4
+        specifier: npm ^0.27.4
         version: 0.27.4
       mitata:
         specifier: ^1.0.34
