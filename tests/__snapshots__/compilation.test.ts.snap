@@ -1,5 +1,18 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`Compilation Tests: Code Transformation > @__MACRO_INLINE__ > should match the snapshot for valid macro output > fixtures/macro-basic.ts 1`] = `
+"const blendAlpha = (a, b) => a * b + 128 >> 8;
+const val1 = 101 * 255 + 128 >> 8;
+const x = 95;
+const y = 222;
+const val2 = x * y + 128 >> 8;
+export {
+  val1,
+  val2
+};
+"
+`;
+
 exports[`Compilation Tests: Code Transformation > should allow custom inline identifier > fixtures/custom-identifier.ts 1`] = `
 "let _subtractResult;
 _subtractLabel: {

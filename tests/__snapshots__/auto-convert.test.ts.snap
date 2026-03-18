@@ -1,0 +1,40 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Auto Convert Inline to Macro (autoConvertInlineToMacro) > Compilation Tests (AST Snapshots) > should output block scopes even if autoConvert is true, because the argument is impure > fixtures/auto-macro-fallback.ts-fallback 1`] = `
+"let i = 5;
+let _squareResult;
+_squareLabel: {
+  let [_arg_x] = [i++];
+  _squareResult = _arg_x * _arg_x;
+  break _squareLabel;
+}
+const val = _squareResult;
+const finalI = i;
+export {
+  finalI,
+  val
+};
+"
+`;
+
+exports[`Auto Convert Inline to Macro (autoConvertInlineToMacro) > Compilation Tests (AST Snapshots) > should output block scopes when autoConvertInlineToMacro is false > fixtures/simple-add.ts-standard 1`] = `
+"let _addResult;
+_addLabel: {
+  let [_arg_a, _arg_b] = [10, 20];
+  _addResult = _arg_a + _arg_b;
+  break _addLabel;
+}
+const result = _addResult;
+export {
+  result
+};
+"
+`;
+
+exports[`Auto Convert Inline to Macro (autoConvertInlineToMacro) > Compilation Tests (AST Snapshots) > should output expression substitution when autoConvertInlineToMacro is true > fixtures/simple-add.ts-converted 1`] = `
+"const result = 10 + 20;
+export {
+  result
+};
+"
+`;

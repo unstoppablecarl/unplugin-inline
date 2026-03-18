@@ -178,4 +178,41 @@ describe('Validation Guardrails (Bailouts)', () => {
 
     expect(errorText).toContain(`Circular dependency detected in @__INLINE__ functions: cycleA -> cycleB -> cycleA`)
   })
+
+  describe('@__MACRO_INLINE__', () => {
+
+    it('should throw a build error when an impure argument is passed to a multi-use parameter', async () => {
+      let caughtError: any
+      const fixturePath = path.join(fixturesDir, 'macro-side-effect-bailout.ts')
+
+      try {
+        await bundleAndRunSilent(fixturePath)
+      } catch (error) {
+        caughtError = error
+      }
+
+      expect(caughtError, 'expected error to be thrown').toBeDefined()
+      expect(caughtError.errors).toBeDefined()
+      const errorText = caughtError.errors[0].text
+
+      expect(errorText).toContain(`Cannot safely expand macro 'square': The argument at index 0 (passed to parameter 'x') contains potential side-effects (e.g., a function call or mutation). Because 'x' is referenced 2 times in the macro body, expanding it would cause the side-effect to be evaluated 2 times instead of exactly once.`)
+    })
+
+    it('should throw a build error if the macro blueprint contains multiple statements', async () => {
+      let caughtError: any
+      const fixturePath = path.join(fixturesDir, 'macro-invalid-bailout.ts')
+
+      try {
+        await bundleAndRunSilent(fixturePath)
+      } catch (error) {
+        caughtError = error
+      }
+
+      expect(caughtError, 'expected error to be thrown').toBeDefined()
+      expect(caughtError.errors).toBeDefined()
+      const errorText = caughtError.errors[0].text
+
+      expect(errorText).toContain(`Macros can only have one statement.`)
+    })
+  })
 })

@@ -1,30 +1,32 @@
 import { type NodePath, type Visitor } from '@babel/traverse'
 import * as t from '@babel/types'
-import type { InlinePluginOptions, ResolvedImport } from '../_types'
+import { type InlineCandidate, InlineCandidateType, type InlinePluginOptions, type ResolvedImport } from '../_types'
 import type { ErrorManager } from './ErrorManager'
 import type { InlineRegistry } from './InlineRegistry'
 
 export function validateFunctionForInlining(
   id: string,
   opts: InlinePluginOptions,
-  definitionPath: NodePath<t.FunctionDeclaration | t.VariableDeclarator>,
+  candidate: InlineCandidate,
   errorManager: ErrorManager,
   importMap: Map<string, ResolvedImport>,
   inlineRegistry: InlineRegistry,
 ): boolean {
   let isValid = true
+  const definitionPath = candidate.nodePath
   const isArrow = definitionPath.isVariableDeclarator()
+  const funcPath = isArrow ? (definitionPath.get('init') as NodePath<t.ArrowFunctionExpression>) : (definitionPath as NodePath<t.FunctionDeclaration>)
 
-  const funcPath = isArrow
-    ? (definitionPath.get('init') as NodePath<t.ArrowFunctionExpression>)
-    : (definitionPath as NodePath<t.FunctionDeclaration>)
-
-  const funcName = isArrow
-    ? (definitionPath.node.id as t.Identifier).name
-    : (funcPath.node as t.FunctionDeclaration).id!.name
-
+  const funcName = candidate.normalizedName
   const extendedGlobals = new Set([...opts.allowedGlobals])
   const targetNode = definitionPath.node
+
+  if (candidate.type === InlineCandidateType.MACRO) {
+    const macroExpr = validateMacro(candidate.normalizedBody, errorManager)
+    if (!macroExpr) {
+      isValid = false
+    }
+  }
 
   const isOwnedByFunction = (name: string, currentPath: NodePath): boolean => {
     const binding = currentPath.scope.getBinding(name)
@@ -52,9 +54,7 @@ export function validateFunctionForInlining(
     isValid = false
   }
 
-  if (!isValid) {
-    return false
-  }
+  if (!isValid) return false
 
   const visitor: Visitor = {
     ThisExpression(path) {
@@ -62,12 +62,11 @@ export function validateFunctionForInlining(
       isValid = false
       path.stop()
     },
-
     Identifier(path) {
       if (!path.isReferencedIdentifier()) return
+
       const name = path.node.name
 
-      // Check for 'arguments' keyword
       if (name === 'arguments') {
         errorManager.recordError(`Cannot inline function '${funcName}': uses 'arguments' keyword.`, targetNode)
         isValid = false
@@ -81,53 +80,39 @@ export function validateFunctionForInlining(
       const imported = importMap.get(name)
 
       if (imported) {
-        // Cross-file check
         isRegistryFunction = inlineRegistry.has(imported.sourcePath, imported.originalName)
       } else {
-        // Peer-function check (same file)
         isRegistryFunction = inlineRegistry.has(id, name)
       }
 
-      /**
-       * Purity Check:
-       * Allow if:
-       * 1. Bound within the function (local var, param, or nested function)
-       * 2. It is a known global (Math, console, etc.)
-       * 3. It is another function marked for inlining (Phase 2 handles this)
-       */
       if (!isBoundLocally && !isGlobal && !isRegistryFunction) {
-        errorManager.recordError(
-          `Cannot inline function '${funcName}': references external variable or non-inlinable function '${name}'. Inlined functions must be pure.`,
-          targetNode,
-        )
+        errorManager.recordError(`Cannot inline function '${funcName}': references external variable or non-inlinable function '${name}'. Inlined functions must be pure.`, targetNode)
         isValid = false
         path.stop()
       }
     },
-
     CallExpression(path) {
       const callee = path.node.callee
-      // Direct Recursion Check
+
       if (t.isIdentifier(callee) && callee.name === funcName) {
         errorManager.recordError(`Cannot inline function '${funcName}': recursive calls are not supported.`, targetNode)
         isValid = false
         path.stop()
       }
     },
-
     AssignmentExpression(path) {
       const left = path.node.left
+
       if (t.isIdentifier(left)) {
-        // Mutation Check: Variable must be owned by this function's scope
         if (!isOwnedByFunction(left.name, path)) {
           errorManager.recordError(`Cannot inline function '${funcName}': mutates outer scope variable '${left.name}'.`, targetNode)
           isValid = false
         }
       }
     },
-
     UpdateExpression(path) {
       const arg = path.node.argument
+
       if (t.isIdentifier(arg)) {
         if (!isOwnedByFunction(arg.name, path)) {
           errorManager.recordError(`Cannot inline function '${funcName}': mutates outer scope variable '${arg.name}'.`, targetNode)
@@ -135,7 +120,6 @@ export function validateFunctionForInlining(
         }
       }
     },
-
     Function(childPath) {
       childPath.skip()
     },
@@ -144,14 +128,50 @@ export function validateFunctionForInlining(
   const bodyPath = funcPath.get('body') as NodePath<t.Node>
 
   bodyPath.traverse(visitor)
-  /**
-   * CRITICAL: We must NOT use { noScope: true } here.
-   * By allowing Babel to crawl the scope, path.scope.hasBinding() can
-   * correctly identify variables declared INSIDE the function body.
-   */
-  // traverse(definitionPath.node.body, visitor, definitionPath.scope)
 
   return isValid
+}
+
+export function getMacroExpression(body: t.Node): t.Expression | null {
+  if (t.isExpression(body)) return body
+
+  if (t.isBlockStatement(body)) {
+    if (body.body.length !== 1) return null
+
+    const firstStmt = body.body[0]
+
+    if (t.isReturnStatement(firstStmt) && firstStmt.argument) return firstStmt.argument
+  }
+
+  return null
+}
+
+export function validateMacro(body: t.Node, errorManager: ErrorManager): t.Expression | null {
+  if (t.isExpression(body)) return body
+
+  if (t.isBlockStatement(body)) {
+    if (body.body.length !== 1) {
+      errorManager.recordError('Macros can only have one statement.', body)
+      return null
+    }
+
+    const firstStmt = body.body[0]
+
+    if (!t.isReturnStatement(firstStmt)) {
+      errorManager.recordError('Macro block statements must consist of a single return statement.', firstStmt)
+      return null
+    }
+
+    if (!firstStmt.argument) {
+      errorManager.recordError('Macro return statement must return a value.', firstStmt)
+      return null
+    }
+
+    return firstStmt.argument
+  }
+
+  errorManager.recordError('Macros must resolve to a single pure expression.', body)
+  return null
 }
 
 export function isUsedInShortCircuit(path: NodePath<t.CallExpression>): boolean {
@@ -160,27 +180,16 @@ export function isUsedInShortCircuit(path: NodePath<t.CallExpression>): boolean 
 
   while (current && current !== stmt) {
     const parent: NodePath<t.Node> = current.parentPath!
+
     if (!parent) break
 
-    // Right side of && or ||
-    if (parent.isLogicalExpression() && current.key === 'right') {
-      return true
-    }
+    if (parent.isLogicalExpression() && current.key === 'right') return true
 
-    // Consequent or Alternate of a ternary (a ? b : c)
-    if (parent.isConditionalExpression() && (current.key === 'consequent' || current.key === 'alternate')) {
-      return true
-    }
+    if (parent.isConditionalExpression() && (current.key === 'consequent' || current.key === 'alternate')) return true
 
-    // Right side of logical assignment (a ||= b)
-    if (parent.isAssignmentExpression() && ['||=', '&&=', '??='].includes(parent.node.operator) && current.key === 'right') {
-      return true
-    }
+    if (parent.isAssignmentExpression() && ['||=', '&&=', '??='].includes(parent.node.operator) && current.key === 'right') return true
 
-    // Optional chaining (a?.b())
-    if (parent.isOptionalCallExpression() || parent.isOptionalMemberExpression()) {
-      return true
-    }
+    if (parent.isOptionalCallExpression() || parent.isOptionalMemberExpression()) return true
 
     current = parent
   }

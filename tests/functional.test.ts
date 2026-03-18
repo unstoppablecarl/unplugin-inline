@@ -135,4 +135,29 @@ describe('Functional Tests: Execution and Logic', () => {
     // 30 + 10 + 3 = 43
     expect(exports.result).toBe(43)
   })
+
+  describe('@__INLINE_MACRO__', () => {
+    it('should directly inline pure expressions', async () => {
+      const { exports } = await bundleAndRun(path.join(fixturesDir, 'macro-basic.ts'))
+      // (100 * 255 + 128) >> 8 === 100
+      expect((exports as any).val1).toBe(101)
+      expect((exports as any).val2).toBe(82)
+
+    })
+
+    it('should wrap arguments in parentheses to preserve operator precedence', async () => {
+      const { exports } = await bundleAndRun(path.join(fixturesDir, 'macro-precedence.ts'))
+      // (5 + 5) * 2 === 20. If it failed precedence, it would be 15.
+      expect((exports as any).val).toBe(20)
+    })
+
+    it('should allow side-effect arguments if the parameter is referenced exactly once', async () => {
+      const { exports } = await bundleAndRun(path.join(fixturesDir, 'macro-side-effect-safe.ts'))
+      // 10 + 1 === 11
+      expect((exports as any).val).toBe(11)
+      // i should only be incremented once
+      expect((exports as any).finalI).toBe(11)
+    })
+  })
+
 })

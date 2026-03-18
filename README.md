@@ -22,10 +22,12 @@ yarn add -D unplugin-inline
 
 ## Example Usage
 
+### 1. Standard Block Inlining (`@__INLINE__`)
+
 Consider a physics simulation where `transformPoint` is called millions of times per frame. The function is large enough
 that V8 refuses to inline it automatically.
 
-### Source Code
+#### Source Code
 
 **`src/physics.ts`**
 
@@ -51,7 +53,7 @@ export function processVertices(vertices: Float32Array, matrix: Float32Array): n
 }
 ```
 
-### Compiled Output
+#### Compiled Output
 
 The compiled output has no `transformPoint` declaration. Its body is placed directly at the call site as a flat labeled
 block:
@@ -78,6 +80,25 @@ function processVertices(vertices, matrix) {
   }
   return sum;
 }
+```
+
+#### 2. Macro Expression Inlining (`@__INLINE_MACRO__`)
+
+For extremely hot, small math utility functions, generating block scopes can bloat the bundle and create unnecessary extra variables environments. Using `@__INLINE_MACRO__` bypasses block generation entirely, performing a direct AST expression substitution wrapped in parentheses to preserve operator precedence.
+
+**`src/math.ts`**
+
+```ts
+/** @__INLINE_MACRO__ */
+const blendAlpha = (a: number, b: number) => (a * b + 128) >> 8;
+
+export const color = blendAlpha(100, 255) * 2;
+```
+
+**`dist/math.js`**
+
+```js
+export const color = (((100) * (255) + 128) >> 8) * 2;
 ```
 
 *Both block (`/* @__INLINE__ */`) and line (`// @__INLINE__`) comment styles are recognized.*
@@ -136,7 +157,6 @@ export default {
   input: 'input.js',
   plugins: [rollupPlugin()],
 }
-
 ```
 
 ### Webpack
@@ -153,24 +173,26 @@ module.exports = {
 
 ## Configuration Options
 
-| Option             | Type       | Default                                                         | Description                                            |
-|--------------------|------------|-----------------------------------------------------------------|--------------------------------------------------------|
-| `inlineIdentifier` | `string`   | `'@__INLINE__'`                                                 | The comment string used to mark functions.             |
-| `allowedGlobals`   | `string[]` | [See Defaults](https://www.google.com/search?q=src/defaults.ts) | Global identifiers available inside inlined functions. |
-| `fileExtensions`   | `string[]` | [See Defaults](https://www.google.com/search?q=src/defaults.ts) | File extensions the plugin will process.               |
+| Option                     | Type       | Default                                                         | Description                                                                                                                                                                                                             |
+|----------------------------|------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `inlineIdentifier`         | `string`   | `'@__INLINE__'`                                                 | The comment string used to mark functions for standard block inlining.                                                                                                                                                  |
+| `inlineMacroIdentifier`    | `string`   | `'@__INLINE_MACRO__'`                                           | The comment string used to mark functions for direct AST expression substitution (Macros).                                                                                                                              |
+| `autoConvertInlineToMacro` | `boolean`  | `true`                                                          | If `true`, the plugin will attempt to automatically upgrade standard `@__INLINE__` functions to macros if they meet all safety requirements, falling back to block-scoping if they don't or if passed impure arguments. |
+| `allowedGlobals`           | `string[]` | [See Defaults](https://www.google.com/search?q=src/defaults.ts) | Global identifiers available inside inlined functions.                                                                                                                                                                  |
+| `fileExtensions`           | `string[]` | [See Defaults](https://www.google.com/search?q=src/defaults.ts) | File extensions the plugin will process.                                                                                                                                                                                |
 
 ## ⚠️ Requirements & Restrictions
 
 A function must be **pure** to be inlinable. The plugin enforces strict AST analysis and will throw build errors if you
 violate these rules:
 
-- **No async or generators** — `async`/`await` and `function*` alter execution timing.
-- **No `this` or `arguments`** — both bind to the caller after inlining, producing unpredictable results.
-- **No outer scope mutations** — cannot reassign variables declared outside the function's own block.
-- **No outer scope references** — cannot read variables from an outer scope. Standard globals (`Math`, `JSON`, etc.) are
+* **No async or generators** — `async`/`await` and `function*` alter execution timing.
+* **No `this` or `arguments**` — both bind to the caller after inlining, producing unpredictable results.
+* **No outer scope mutations** — cannot reassign variables declared outside the function's own block.
+* **No outer scope references** — cannot read variables from an outer scope. Standard globals (`Math`, `JSON`, etc.) are
   permitted — see `allowedGlobals` for the full default list.
-- **No recursive functions** — recursion cannot be unrolled at the call site.
-- **No call expressions in conditionals** — the function must be called as a standalone statement or direct assignment,
+* **No recursive functions** — recursion cannot be unrolled at the call site.
+* **No call expressions in conditionals** — the function must be called as a standalone statement or direct assignment,
   not inside a ternary or `if` condition. Assign the result first:
 
 ```js
@@ -183,6 +205,13 @@ const processed = processValue(x)
 if (processed > 100) { // ...
 }
 ```
+
+### Specific Requirements for Macros (`@__INLINE_MACRO__`)
+
+Because macros perform direct AST substitution rather than creating a lexical block scope, they have additional strict requirements:
+
+* **Must resolve to a single pure expression** — Macros cannot contain multiple statements, variable declarations, or block-level logic (like `if` statements). Arrow functions with implicit returns or standard functions with a single `return` statement are allowed.
+* **No Side-Effect Duplication (Multiple Evaluation Bug)** — If an argument with side-effects (e.g., `i++`, `Math.random()`, `getPixel()`) is passed into a macro, the plugin analyzes how many times that parameter is referenced in the macro body. If the parameter is referenced more than once, expanding the macro would cause the side-effect to be evaluated multiple times. The build will throw a safety validation error.
 
 ## Benchmarks
 

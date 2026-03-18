@@ -21,6 +21,8 @@ const generate = ((_generate as any).default || _generate) as typeof _generate
 export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOptions>) => {
   const opts = {
     inlineIdentifier: '@__INLINE__',
+    inlineMacroIdentifier: '@__INLINE_MACRO__',
+    autoConvertInlineToMacro: true,
     allowedGlobals: STANDARD_GLOBALS,
     fileExtensions: FILE_EXTENSIONS,
     variableNamePrefix: '',
@@ -82,12 +84,12 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
             importMap,
           } = await findInlineCandidates(targetPath, opts, fileAst, resolver, inlineRegistry, greedyProcessFile)
 
-          for (const { nodePath, normalizedName } of candidatesInFile) {
-            const isValid = validateFunctionForInlining(targetPath, opts, nodePath, errMgr, importMap, inlineRegistry)
-            if (!isValid) inlineRegistry.delete(targetPath, normalizedName)
+          for (const candidate of candidatesInFile) {
+            const isValid = validateFunctionForInlining(targetPath, opts, candidate, errMgr, importMap, inlineRegistry)
+            if (!isValid) inlineRegistry.delete(targetPath, candidate.normalizedName)
           }
 
-          flattenInlinedFunctions(targetPath, opts, candidatesInFile, inlineRegistry)
+          flattenInlinedFunctions(targetPath, opts, candidatesInFile, inlineRegistry, errorManager)
         } catch (e: any) {
           // File vanished
           if (e.code === 'ENOENT') return
@@ -105,23 +107,23 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
       } = await findInlineCandidates(id, opts, ast, resolver, inlineRegistry, greedyProcessFile)
 
       // validate candidates
-      for (const { nodePath, normalizedName } of candidatesInFile) {
+      for (const candidate of candidatesInFile) {
         const isValid = validateFunctionForInlining(
           id,
           opts,
-          nodePath,
+          candidate,
           errorManager,
           importMap,
           inlineRegistry,
         )
 
         if (!isValid) {
-          inlineRegistry.delete(id, normalizedName)
+          inlineRegistry.delete(id, candidate.normalizedName)
           throw errorManager.makeValidationError()
         }
       }
 
-      flattenInlinedFunctions(id, opts, candidatesInFile, inlineRegistry)
+      flattenInlinedFunctions(id, opts, candidatesInFile, inlineRegistry, errorManager)
 
       applyInlining(id, opts, ast, importMap, errorManager, inlineRegistry)
 
@@ -160,7 +162,7 @@ export function applyInlining(
           throw errorManager.makeValidationError()
         }
 
-        executeInlining(path, opts, blueprint)
+        executeInlining(path, opts, blueprint, errorManager)
       }
     },
     Function(p) {

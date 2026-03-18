@@ -1,7 +1,7 @@
 import _traverse from '@babel/traverse'
 import * as t from '@babel/types'
 import type { InlineCandidate, InlinePluginOptions } from '../_types'
-import { makeErrorManager } from './ErrorManager'
+import { type ErrorManager, makeErrorManager } from './ErrorManager'
 import { executeInlining } from './executeInlining'
 import type { InlineRegistry } from './InlineRegistry'
 
@@ -12,6 +12,7 @@ export function flattenInlinedFunctions(
   opts: InlinePluginOptions,
   candidatesInFile: InlineCandidate[],
   inlineRegistry: InlineRegistry,
+  errorManager: ErrorManager,
 ): void {
   // getSortedOrder now throws a validation error if a cycle is found
   const sortedNames = getSortedOrder(id, candidatesInFile)
@@ -45,7 +46,7 @@ export function flattenInlinedFunctions(
 
         // If the call is to another inlinable function in the registry, flatten it
         if (dependency) {
-          executeInlining(path, opts, dependency)
+          executeInlining(path, opts, dependency, errorManager)
         }
       },
       Function(p) {

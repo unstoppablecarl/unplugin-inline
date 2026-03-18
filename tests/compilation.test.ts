@@ -1,17 +1,10 @@
 import path from 'node:path'
 import { fileURLToPath } from 'url'
 import { describe, expect, it } from 'vitest'
-import { bundle, bundleSilent } from './_helpers'
+import { bundle, bundleSilent, getSnapshotKey } from './_helpers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixturesDir = path.resolve(__dirname, 'fixtures')
-
-/**
- * Helper to get a stable relative path for snapshot keys
- */
-const getSnapshotKey = (targetPath: string) => {
-  return path.relative(__dirname, targetPath)
-}
 
 describe('Compilation Tests: Code Transformation', () => {
   it('should inline a simple function returning a literal', async () => {
@@ -139,5 +132,13 @@ describe('Compilation Tests: Code Transformation', () => {
     const target = path.join(fixturesDir, 'multiple-calls-on-one-line.ts')
     const output = await bundle(target)
     expect(output).toMatchSnapshot(getSnapshotKey(target))
+  })
+
+  describe('@__MACRO_INLINE__', () => {
+    it('should match the snapshot for valid macro output', async () => {
+      const target = path.join(fixturesDir, 'macro-basic.ts')
+      const output = await bundle(target)
+      expect(output).toMatchSnapshot(getSnapshotKey(target))
+    })
   })
 })

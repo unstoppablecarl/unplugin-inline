@@ -1,6 +1,8 @@
 import type { BuildOptions, BuildResult } from 'esbuild'
 import { build } from 'esbuild'
+import path from 'node:path'
 import { rollup } from 'rollup'
+import { fileURLToPath } from 'url'
 import type { InlinePluginOptions } from '../src'
 import { esbuildPlugin, rollupPlugin } from '../src'
 
@@ -35,6 +37,7 @@ export async function bundle(fixturePath: string, options: InlinePluginTestOptio
 
   // @ts-expect-error
   options.variableNamePrefix = TEST_VARIABLE_NAME_PREFIX
+  options.autoConvertInlineToMacro ??= false
   const buildOptions: BuildOptions = {
     entryPoints: [
       fixturePath,
@@ -68,6 +71,7 @@ export async function bundleAndRun(fixturePath: string, options: InlinePluginTes
   let result: BuildResult
   // @ts-expect-error
   options.variableNamePrefix = TEST_VARIABLE_NAME_PREFIX
+  options.autoConvertInlineToMacro ??= false
 
   try {
     const buildOptions: BuildOptions = {
@@ -139,9 +143,11 @@ export async function bundleAndRun(fixturePath: string, options: InlinePluginTes
  * and returns the exports and logs.
  */
 export async function bundleAndRunRollup(fixturePath: string, options: InlinePluginTestOptions = {}) {
-  const pluginInstance = rollupPlugin(options)
   // @ts-expect-error
   options.variableNamePrefix = TEST_VARIABLE_NAME_PREFIX
+  options.autoConvertInlineToMacro ??= false
+
+  const pluginInstance = rollupPlugin(options)
 
   try {
     const bundle = await rollup({
@@ -181,4 +187,13 @@ export async function bundleAndRunRollup(fixturePath: string, options: InlinePlu
     }
     throw error
   }
+}
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+/**
+ * Helper to get a stable relative path for snapshot keys
+ */
+export const getSnapshotKey = (targetPath: string) => {
+  return path.relative(__dirname, targetPath)
 }
