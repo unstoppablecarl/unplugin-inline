@@ -19,20 +19,36 @@ export function makeErrorManager(id: string) {
     errors.push(fullMessage)
   }
 
-  function makeValidationError() {
-    if (errors.length > 0) {
-      return new Error(`[unplugin-inline] Validation failed:\n${errors.join('\n')}`)
-    }
+  function hasValidationErrors() {
+    return errors.length > 0
   }
 
-  function makeUsageError() {
+  function reportValidationErrors() {
+    return new Error(`[unplugin-inline] Validation failed:\n${errors.join('\n')}`)
+  }
+
+  function makeValidationError(message: string, node?: t.Node) {
+    recordError(message, node)
+    return new Error(`[unplugin-inline] Validation failed:\n${errors.join('\n')}`)
+  }
+
+  function makeUsageError(message: string, node?: t.Node) {
+    recordError(message, node)
     return new Error(`[unplugin-inline] Usage Error:\n${errors.join('\n')}`)
+  }
+
+  function makeInternalError(message: string, node?: t.Node) {
+    recordError(message, node)
+    return new Error(`[unplugin-inline] Internal Error:\n${errors.join('\n')}`)
   }
 
   return {
     errors,
     recordError,
-    makeValidationError,
+    reportValidationErrors,
     makeUsageError,
+    makeInternalError,
+    makeValidationError,
+    hasValidationErrors,
   }
 }

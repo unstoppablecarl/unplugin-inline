@@ -22,7 +22,7 @@ export function flattenInlinedFunctions(
 
     if (!target || !target.body) {
       const err = makeErrorManager(id)
-      err.recordError(
+      throw err.makeValidationError(
         `Internal Error: Blueprint for '${name}' was not found or is empty.`,
         candidatesInFile.find(({ nodePath }) => {
           const p = nodePath
@@ -30,7 +30,6 @@ export function flattenInlinedFunctions(
             (t.isVariableDeclarator(p.node) && t.isIdentifier((p.node as any).id) && (p.node as any).id.name === name)
         })?.nodePath?.node, // Safely fall back to undefined if not found
       )
-      throw err.makeValidationError()
     }
 
     // Wrap the blueprint body in a temporary file/program
@@ -72,12 +71,6 @@ export function getSortedOrder(
   const recStack = new Set<string>()
   const result: string[] = []
 
-  // Pre-calculate dependencies
-  const adj = new Map<string, Set<string>>()
-  for (const candidate of candidatesInFile) {
-    adj.set(candidate.normalizedName, getLocalDependencies(candidate.normalizedBody, new Set(candidateMap.keys())))
-  }
-
   function visit(name: string) {
     const candidate = candidateMap.get(name)
     if (!candidate) return
@@ -89,22 +82,20 @@ export function getSortedOrder(
 
       const err = makeErrorManager(id)
       // We pass the actual AST node of the function declaration to the error manager
-      err.recordError(
+      throw err.makeUsageError(
         `Circular dependency detected in @__INLINE__ functions: ${cyclePath}`,
         candidate.nodePath.node,
       )
-      throw err.makeUsageError()
     }
 
     if (visited.has(name)) return
 
     recStack.add(name)
-    const deps = adj.get(name)
-    if (deps) {
-      for (const dep of deps) {
-        visit(dep)
-      }
+
+    for (const dep of candidate.localDependencies) {
+      visit(dep)
     }
+
     recStack.delete(name)
     visited.add(name)
     result.push(name)
@@ -115,23 +106,4 @@ export function getSortedOrder(
   }
 
   return result
-}
-
-export function getLocalDependencies(body: t.BlockStatement, candidateNames: Set<string>): Set<string> {
-  const deps = new Set<string>()
-  traverse(body, {
-    CallExpression(path) {
-      if (t.isIdentifier(path.node.callee)) {
-        const name = path.node.callee.name
-        if (candidateNames.has(name)) {
-          deps.add(name)
-        }
-      }
-    },
-    Function(p) {
-      p.skip()
-    },
-    noScope: true,
-  })
-  return deps
 }

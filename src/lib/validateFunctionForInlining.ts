@@ -11,8 +11,7 @@ export function validateFunctionForInlining(
   errorManager: ErrorManager,
   importMap: Map<string, ResolvedImport>,
   inlineRegistry: InlineRegistry,
-): boolean {
-  let isValid = true
+) {
   const definitionPath = candidate.nodePath
   const isArrow = definitionPath.isVariableDeclarator()
   const funcPath = isArrow ? (definitionPath.get('init') as NodePath<t.ArrowFunctionExpression>) : (definitionPath as NodePath<t.FunctionDeclaration>)
@@ -22,10 +21,7 @@ export function validateFunctionForInlining(
   const targetNode = definitionPath.node
 
   if (candidate.type === InlineCandidateType.MACRO) {
-    const macroExpr = validateMacro(candidate.normalizedBody, errorManager)
-    if (!macroExpr) {
-      isValid = false
-    }
+    validateMacro(candidate.normalizedBody, errorManager)
   }
 
   const isOwnedByFunction = (name: string, currentPath: NodePath): boolean => {
@@ -46,20 +42,17 @@ export function validateFunctionForInlining(
 
   if (funcPath.node.async) {
     errorManager.recordError(`Cannot inline function '${funcName}': async functions are not supported.`, funcPath.node)
-    isValid = false
   }
 
   if (funcPath.node.generator) {
     errorManager.recordError(`Cannot inline function '${funcName}': generator functions are not supported.`, funcPath.node)
-    isValid = false
   }
 
-  if (!isValid) return false
+  if (errorManager.hasValidationErrors()) return
 
   const visitor: Visitor = {
     ThisExpression(path) {
       errorManager.recordError(`Cannot inline function '${funcName}': uses 'this' keyword.`, targetNode)
-      isValid = false
       path.stop()
     },
     Identifier(path) {
@@ -69,7 +62,6 @@ export function validateFunctionForInlining(
 
       if (name === 'arguments') {
         errorManager.recordError(`Cannot inline function '${funcName}': uses 'arguments' keyword.`, targetNode)
-        isValid = false
         path.stop()
         return
       }
@@ -87,7 +79,6 @@ export function validateFunctionForInlining(
 
       if (!isBoundLocally && !isGlobal && !isRegistryFunction) {
         errorManager.recordError(`Cannot inline function '${funcName}': references external variable or non-inlinable function '${name}'. Inlined functions must be pure.`, targetNode)
-        isValid = false
         path.stop()
       }
     },
@@ -96,7 +87,6 @@ export function validateFunctionForInlining(
 
       if (t.isIdentifier(callee) && callee.name === funcName) {
         errorManager.recordError(`Cannot inline function '${funcName}': recursive calls are not supported.`, targetNode)
-        isValid = false
         path.stop()
       }
     },
@@ -106,7 +96,6 @@ export function validateFunctionForInlining(
       if (t.isIdentifier(left)) {
         if (!isOwnedByFunction(left.name, path)) {
           errorManager.recordError(`Cannot inline function '${funcName}': mutates outer scope variable '${left.name}'.`, targetNode)
-          isValid = false
         }
       }
     },
@@ -116,7 +105,6 @@ export function validateFunctionForInlining(
       if (t.isIdentifier(arg)) {
         if (!isOwnedByFunction(arg.name, path)) {
           errorManager.recordError(`Cannot inline function '${funcName}': mutates outer scope variable '${arg.name}'.`, targetNode)
-          isValid = false
         }
       }
     },
@@ -128,8 +116,6 @@ export function validateFunctionForInlining(
   const bodyPath = funcPath.get('body') as NodePath<t.Node>
 
   bodyPath.traverse(visitor)
-
-  return isValid
 }
 
 export function getMacroExpression(body: t.Node): t.Expression | null {

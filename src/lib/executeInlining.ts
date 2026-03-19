@@ -23,7 +23,9 @@ export function executeInlining(
   let shouldUseMacro = false
 
   if (blueprint.type === InlineCandidateType.MACRO) {
-    if (!macroExpr) throw new Error(`Invariant violation: Invalid macro blueprint for '${funcName}' bypassed Phase 1 validation.`)
+    if (!macroExpr) {
+      throw errorManager.makeInternalError(`Invariant violation: Invalid macro blueprint for '${funcName}' bypassed Phase 1 validation.`, path.node)
+    }
 
     const safetyCheck = checkSubstitutionSafety(args, params, macroExpr)
 
@@ -31,8 +33,7 @@ export function executeInlining(
       const { argIndex, paramName, refCount } = safetyCheck
       const targetArgNode = args[argIndex] || path.node
 
-      errorManager.recordError(`Cannot safely expand macro '${funcName}': The argument at index ${argIndex} (passed to parameter '${paramName}') contains potential side-effects (e.g., a function call or mutation). Because '${paramName}' is referenced ${refCount} times in the macro body, expanding it would cause the side-effect to be evaluated ${refCount} times instead of exactly once.`, targetArgNode)
-      throw errorManager.makeValidationError()
+      throw errorManager.makeValidationError(`Cannot safely expand macro '${funcName}': The argument at index ${argIndex} (passed to parameter '${paramName}') contains potential side-effects (e.g., a function call or mutation). Because '${paramName}' is referenced ${refCount} times in the macro body, expanding it would cause the side-effect to be evaluated ${refCount} times instead of exactly once.`, targetArgNode)
     }
 
     shouldUseMacro = true
@@ -78,10 +79,16 @@ export function executeInlining(
 
   const callerArgs = path.node.arguments.map(arg => t.cloneNode(arg as t.Expression))
 
-  const dummyFunc = t.functionDeclaration(t.identifier('__dummy__'), blueprint.params.map(p => t.cloneNode(p as any)), t.cloneNode(blueprint.body as t.BlockStatement))
+  // 1. Create a dummy function to safely utilize Babel's scope tracking
+  const dummyFunc = t.functionDeclaration(
+    t.identifier('__dummy__'),
+    blueprint.params.map(p => t.cloneNode(p as any)),
+    t.cloneNode(blueprint.body as t.BlockStatement),
+  )
 
   const tempFile = t.file(t.program([dummyFunc]))
 
+  // 2. Rename parameters and internal variables safely
   traverse(tempFile, {
     FunctionDeclaration(funcPath) {
       if (funcPath.node.id?.name === '__dummy__') {
@@ -90,7 +97,6 @@ export function executeInlining(
 
           for (const name in bindings) {
             const newName = funcPath.scope.generateUid(`_arg_${name}`)
-
             funcPath.scope.rename(name, newName)
           }
         })
@@ -100,14 +106,14 @@ export function executeInlining(
       const bindings = declPath.getBindingIdentifiers()
 
       for (const name in bindings) {
-        const prefix = opts.variableNamePrefix || '_in_'
+        const prefix = opts.variableNamePrefix
         const newName = declPath.scope.generateUid(`${prefix}${name}`)
-
         declPath.scope.rename(name, newName)
       }
     },
   }, path.scope)
 
+  // 3. Declare Arguments via Array Pattern safely: let [_arg_a, _arg_b] = [10, 20];
   const argDecls = []
 
   if (dummyFunc.params.length > 0 || callerArgs.length > 0) {
@@ -124,6 +130,7 @@ export function executeInlining(
   const finalStatements = [...argDecls, ...dummyFunc.body.body]
   const labeledBlock = t.labeledStatement(labelId, t.blockStatement(finalStatements))
 
+  // 4. Transform Return Statements to Assignments + Break
   traverse(labeledBlock, {
     ReturnStatement(returnPath) {
       const val = returnPath.node.argument || t.identifier('undefined')
@@ -139,12 +146,14 @@ export function executeInlining(
     noScope: true,
   })
 
+  // 5. Safely locate the insertion point
   const parentStmt = path.getStatementParent()
 
   if (!parentStmt) return
 
   const parentBlock = path.findParent(p => p.isBlockStatement())
 
+  // SAFETY MEASURE: Ensure we have a block to insert our variables into
   if (parentBlock) {
     parentStmt.insertBefore([
       t.variableDeclaration('let', [t.variableDeclarator(resultId)]),
@@ -154,9 +163,11 @@ export function executeInlining(
   } else {
     const arrowParent = path.findParent(p => p.isArrowFunctionExpression())
 
+    // If it's an arrow function with an expression body, e.g. `() => add()`
     if (arrowParent && t.isArrowFunctionExpression(arrowParent.node)) {
       const node = arrowParent.node
 
+      // Convert to a block statement body: `() => { return add(); }`
       if (!t.isBlockStatement(node.body)) {
         const bodyPath = arrowParent.get('body') as NodePath<t.Expression>
         const originalBody = t.cloneNode(bodyPath.node)
@@ -167,17 +178,42 @@ export function executeInlining(
           ]),
         )
 
+        // Retry inlining now that a safe block exists
         executeInlining(path, opts, blueprint, errorManager)
         return
       }
     }
 
+    // Fallback if no arrow parent found
     parentStmt.insertBefore([
       t.variableDeclaration('let', [t.variableDeclarator(resultId)]),
       labeledBlock,
     ])
     path.replaceWith(resultId)
   }
+}
+
+/**
+ * Optimized macro substitution that avoids unnecessary parentheses for simple nodes.
+ */
+function substituteMacro(expr: t.Expression, params: t.Identifier[], args: t.Expression[]): t.Expression {
+  const cloned = t.cloneNode(expr)
+  const tempProg = t.program([t.expressionStatement(cloned)])
+
+  traverse(tempProg, {
+    Identifier(p) {
+      const idx = params.findIndex(param => param.name === p.node.name)
+      if (idx !== -1) {
+        const arg = args[idx] || t.identifier('undefined')
+        // Minification: Only wrap in parens if it's a complex expression
+        const needsParens = !t.isIdentifier(arg) && !t.isLiteral(arg) && !t.isMemberExpression(arg)
+        p.replaceWith(needsParens ? t.parenthesizedExpression(t.cloneNode(arg)) : t.cloneNode(arg))
+      }
+    },
+    noScope: true,
+  })
+
+  return (tempProg.body[0] as t.ExpressionStatement).expression
 }
 
 export function getMacroExpression(body: t.Node): t.Expression | null {

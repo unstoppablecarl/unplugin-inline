@@ -28,6 +28,7 @@ export type InlineCandidate = {
   normalizedName: string
   normalizedBody: t.BlockStatement
   nodePath: NodePath<t.FunctionDeclaration | t.VariableDeclarator>
+  localDependencies: Set<string>
 }
 
 export enum InlineCandidateType {

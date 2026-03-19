@@ -22,9 +22,9 @@ export async function findInlineCandidates(
 ) {
   const importMap = new Map<string, ResolvedImport>()
   const candidatesInFile: InlineCandidate[] = []
+  const localCandidateNames = new Set<string>()
 
-  // PRE-RESOLVE IMPORTS
-  // We scan the top-level body for ImportDeclarations
+  // PRE-RESOLVE IMPORTS (Wait for dependencies to be registered)
   const importPromises = ast.program.body
     .filter((node): node is t.ImportDeclaration => t.isImportDeclaration(node))
     .map(async (node) => {
@@ -53,7 +53,7 @@ export async function findInlineCandidates(
 
   await Promise.all(importPromises)
 
-  // SCAN & PROVISIONAL REGISTRATION
+  // FIRST PASS: Find all local candidates
   traverse(ast, {
     FunctionDeclaration(path) {
       const node = path.node
@@ -70,19 +70,15 @@ export async function findInlineCandidates(
       )
 
       if (type !== InlineCandidateType.NONE) {
+        localCandidateNames.add(funcName)
         const body = t.cloneNode(node.body)
-
-        inlineRegistry.set(id, funcName, {
-          params: node.params as t.Identifier[],
-          body,
-          type,
-        })
 
         candidatesInFile.push({
           type,
           normalizedName: funcName,
           normalizedBody: body,
           nodePath: path,
+          localDependencies: new Set(),
         })
       }
     },
@@ -111,7 +107,7 @@ export async function findInlineCandidates(
         )
 
         if (type === InlineCandidateType.NONE) return
-
+        localCandidateNames.add(funcName)
         let body: t.BlockStatement
 
         if (t.isBlockStatement(arrow.body)) {
@@ -125,6 +121,7 @@ export async function findInlineCandidates(
           normalizedName: funcName,
           normalizedBody: body,
           nodePath: path,
+          localDependencies: new Set(),
         })
 
         inlineRegistry.set(id, funcName, {
@@ -135,6 +132,27 @@ export async function findInlineCandidates(
       }
     },
   })
+
+  // 3. SECOND PASS: Scout dependencies for each candidate
+  for (const candidate of candidatesInFile) {
+    const funcPath = candidate.nodePath.isVariableDeclarator()
+      ? (candidate.nodePath.get('init') as any)
+      : candidate.nodePath
+
+    candidate.localDependencies = scoutLocalDependencies(
+      funcPath,
+      localCandidateNames,
+      importMap,
+      inlineRegistry,
+    )
+
+    // Update the registry with the final candidate data
+    inlineRegistry.set(id, candidate.normalizedName, {
+      params: (funcPath.node as any).params,
+      body: candidate.normalizedBody,
+      type: candidate.type,
+    })
+  }
 
   return {
     candidatesInFile,
@@ -154,10 +172,7 @@ export function resolveCandidateType(
   const exportType = getDirective(exportComments, opts)
 
   if (localType !== NONE && exportType !== NONE) {
-    const errManager = makeErrorManager(id)
-
-    errManager.recordError('conflicting directives found', node)
-    throw errManager.makeUsageError()
+    throw makeErrorManager(id).makeUsageError('conflicting directives found', node)
   }
 
   if (localType !== NONE) return localType
@@ -173,65 +188,55 @@ export function getDirective(comments: readonly t.Comment[] | null | undefined, 
   return InlineCandidateType.NONE
 }
 
-function isPureNode(node: t.Node): boolean {
-  // Literals (1, "a", true) and Identifiers (x, y) are pure.
-  // UpdateExpressions (i++) or CallExpressions (foo()) are NOT.
-  if (t.isLiteral(node)) return true
-  if (t.isIdentifier(node)) return true
-  if (t.isThisExpression(node)) return true
+/**
+ * Traverses a function to find external references that could be inlinable functions.
+ * Using the live 'path.scope' here avoids the Null pointer error.
+ */
+function scoutLocalDependencies(
+  funcPath: any,
+  localCandidateNames: Set<string>,
+  importMap: Map<string, ResolvedImport>,
+  inlineRegistry: InlineRegistry,
+): Set<string> {
+  const localDeps = new Set<string>()
 
-  return false
-}
-
-function countReferences(
-  bodyPath: any,
-  paramName: string,
-): number {
-  let count = 0
-
-  bodyPath.traverse({
+  funcPath.traverse({
     Identifier(path: any) {
-      const isMatch = path.node.name === paramName
-      const isRef = path.isReferencedIdentifier()
+      if (!path.isReferencedIdentifier()) return
+      const name = path.node.name
 
-      if (isMatch && isRef) count++
+      // Ignore variables bound specifically inside this function (params/locals)
+      // Top-level module variables will now correctly pass through.
+      if (isOwnedByFunction(name, path, funcPath.scope)) return
+
+      // If it's a local candidate, we MUST track it for sorting/cycle detection
+      if (localCandidateNames.has(name)) {
+        localDeps.add(name)
+        return
+      }
+
+      // If it's an import, check if the source is in the registry
+      const imported = importMap.get(name)
+      if (imported && inlineRegistry.has(imported.sourcePath, imported.originalName)) {
+        // This is an external dependency. We don't need to sort it
+        // locally, but the executeInlining phase will handle it.
+        return
+      }
+    },
+    Function(p: any) {
+      p.skip()
     },
   })
 
-  return count
+  return localDeps
 }
-
-export function isSafeToSubstitute(
-  args: t.Node[],
-  params: t.Identifier[],
-  bodyPath: any,
-): boolean {
-  // 1. Body MUST be an expression, not a complex block statement
-  if (t.isBlockStatement(bodyPath.node)) {
-    return false
+function isOwnedByFunction(name: string, currentPath: any, funcScope: any): boolean {
+  const binding = currentPath.scope.getBinding(name)
+  if (!binding) return false
+  let scope = binding.scope
+  while (scope) {
+    if (scope === funcScope) return true
+    scope = scope.parent // walk up the tree
   }
-
-  // 2. Check each argument for side-effects vs reference count
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i]
-    const param = params[i]
-
-    if (!arg) continue
-    if (!param) continue
-
-    const isPure = isPureNode(arg)
-
-    if (!isPure) {
-      const refCount = countReferences(bodyPath, param.name)
-
-      // If an argument has side effects (like i++), it MUST be evaluated
-      // exactly once. If refCount is 0, it skips the side effect.
-      // If refCount > 1, it duplicates the side effect.
-      if (refCount !== 1) {
-        return false
-      }
-    }
-  }
-
-  return true
+  return false
 }
