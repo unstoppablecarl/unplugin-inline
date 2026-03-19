@@ -1,5 +1,6 @@
 import * as t from '@babel/types'
 
+export const ERROR_PREFIX = '[unplugin-inline]'
 export type ErrorManager = ReturnType<typeof makeErrorManager>
 
 export function makeErrorManager(id: string) {
@@ -24,22 +25,22 @@ export function makeErrorManager(id: string) {
   }
 
   function reportValidationErrors() {
-    return new Error(`[unplugin-inline] Validation failed:\n${errors.join('\n')}`)
+    return new Error(`${ERROR_PREFIX} Validation failed:\n${errors.join('\n')}`)
   }
 
   function makeValidationError(message: string, node?: t.Node) {
     recordError(message, node)
-    return new Error(`[unplugin-inline] Validation failed:\n${errors.join('\n')}`)
+    return new Error(`${ERROR_PREFIX} Validation failed:\n${errors.join('\n')}`)
   }
 
   function makeUsageError(message: string, node?: t.Node) {
     recordError(message, node)
-    return new Error(`[unplugin-inline] Usage Error:\n${errors.join('\n')}`)
+    return new Error(`${ERROR_PREFIX} Usage Error:\n${errors.join('\n')}`)
   }
 
   function makeInternalError(message: string, node?: t.Node) {
     recordError(message, node)
-    return new Error(`[unplugin-inline] Internal Error:\n${errors.join('\n')}`)
+    return new Error(`${ERROR_PREFIX} Internal Error:\n${errors.join('\n')}`)
   }
 
   return {

@@ -8,7 +8,7 @@ import { createUnplugin } from 'unplugin'
 import type { FileResolver, InlinePluginOptions, ResolvedImport } from './_types'
 import { FILE_EXTENSIONS, STANDARD_GLOBALS } from './defaults'
 import { normalizePath } from './lib/_helpers'
-import { type ErrorManager, makeErrorManager } from './lib/ErrorManager'
+import { ERROR_PREFIX, type ErrorManager, makeErrorManager } from './lib/ErrorManager'
 import { executeInlining } from './lib/executeInlining'
 import { findInlineCandidates } from './lib/findInlineCandidates'
 import { flattenInlinedFunctions } from './lib/flattenInlinedFunctions'
@@ -25,12 +25,12 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
     autoConvertInlineToMacro: true,
     allowedGlobals: STANDARD_GLOBALS,
     fileExtensions: FILE_EXTENSIONS,
-    variableNamePrefix: '',
+    variableNamePrefix: '_',
     ...options ?? {},
   }
 
   if (!(typeof opts.variableNamePrefix === 'string') || opts.variableNamePrefix === '') {
-    throw new Error('[unplugin-inline] opts.variableNamePrefix is required')
+    throw new Error(`${ERROR_PREFIX} opts.variableNamePrefix is required`)
   }
 
   const inlineRegistry = makeInlineRegistry()
