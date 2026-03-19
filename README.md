@@ -84,7 +84,7 @@ function processVertices(vertices, matrix) {
 
 #### 2. Macro Expression Inlining (`@__INLINE_MACRO__`)
 
-For extremely hot, small math utility functions, generating block scopes can bloat the bundle and create unnecessary extra variables environments. Using `@__INLINE_MACRO__` bypasses block generation entirely, performing a direct AST expression substitution wrapped in parentheses to preserve operator precedence.
+For extremely hot, small math utility functions, generating block scopes can bloat the bundle and create unnecessary extra variables. Using `@__INLINE_MACRO__` bypasses block generation entirely, performing a direct AST expression substitution wrapped in parentheses to preserve operator precedence.
 
 **`src/math.ts`**
 
