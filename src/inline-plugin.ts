@@ -34,8 +34,8 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
   }
 
   const inlineRegistry = makeInlineRegistry()
-  // const globalVisitedFiles = new Set<string>()
   const discoveryCache = new Map<string, Promise<void>>()
+  const visiting = new Set<string>()
 
   return {
     name: 'unplugin-inline',
@@ -78,11 +78,15 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
         const normTarget = normalizePath(targetPath)
         if (!opts.fileExtensions.some(ext => normTarget.endsWith(ext))) return Promise.resolve()
 
+        // Break circularity: If we are already visiting this file in the current call stack,
+        // return immediately to avoid a deadlock.
+        if (visiting.has(normTarget)) return Promise.resolve()
+
         const cached = discoveryCache.get(normTarget)
         if (cached) return cached
 
-        // 1. Create the async logic
         const runDiscovery = async () => {
+          visiting.add(normTarget)
           try {
             const fileCode = await fs.promises.readFile(normTarget, 'utf-8')
             const fileAst = parse(fileCode, { sourceType: 'module', plugins: ['typescript'] })
@@ -97,12 +101,13 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
             }
             flattenInlinedFunctions(normTarget, opts, candidatesInFile, inlineRegistry, errMgr)
             if (errMgr.hasValidationErrors()) {
-              // inlineRegistry.delete(normTarget, candidate.normalizedName)
               throw errMgr.reportValidationErrors()
             }
           } catch (e: any) {
             if (e?.code === 'ENOENT' || e?.code === 'EISDIR') return
             throw e
+          } finally {
+            visiting.delete(normTarget)
           }
         }
 
@@ -144,10 +149,7 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
 
       removeInlinedFunctions(ast, opts)
 
-      // We call crawl() here to ensure Babel's reference counts are 100% accurate
-      // after all the heavy AST manipulation we just did.
-      ast.program.body.forEach(() => {
-      })
+      // Clear the Babel traverse cache and force a scope refresh
       traverse.cache.clear()
       cleanupUnusedImports(ast)
 
