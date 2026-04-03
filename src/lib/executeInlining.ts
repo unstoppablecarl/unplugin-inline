@@ -22,6 +22,8 @@ export function executeInlining(
 
   let shouldUseMacro = false
 
+  console.log(`[unplugin-inline] inlining: ${funcName}` + (blueprint.type === InlineCandidateType.MACRO ? ' (macro)' : ''))
+
   if (blueprint.type === InlineCandidateType.MACRO) {
     if (!macroExpr) {
       throw errorManager.makeInternalError(`Invariant violation: Invalid macro blueprint for '${funcName}' bypassed Phase 1 validation.`, path.node)
