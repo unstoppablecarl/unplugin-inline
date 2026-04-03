@@ -11,6 +11,7 @@ import { makeErrorManager } from './ErrorManager'
 import { type InlineRegistry } from './InlineRegistry'
 
 const traverse = ((_traverse as any).default || _traverse) as typeof _traverse
+const DEBUG = process.env.DEBUG_UNPLUGIN_INLINE === 'true'
 
 export async function findInlineCandidates(
   id: string,
@@ -24,36 +25,9 @@ export async function findInlineCandidates(
   const candidatesInFile: InlineCandidate[] = []
   const localCandidateNames = new Set<string>()
 
-  // PRE-RESOLVE IMPORTS (Wait for dependencies to be registered)
-  const importPromises = ast.program.body
-    .filter((node): node is t.ImportDeclaration => t.isImportDeclaration(node))
-    .map(async (node) => {
-      const source = node.source.value
-      const resolvedPath = await resolver(source, id)
-
-      // If resolver returns null, we can't track this source.
-      if (!resolvedPath) return
-
-      // 1. Immediately parse the imported file and extract its blueprints
-      await processImport(resolvedPath)
-
-      node.specifiers.forEach(spec => {
-        if (t.isImportSpecifier(spec) || t.isImportDefaultSpecifier(spec)) {
-          const importedName = t.isImportSpecifier(spec)
-            ? (t.isIdentifier(spec.imported) ? spec.imported.name : spec.imported.value)
-            : 'default'
-
-          importMap.set(spec.local.name, {
-            sourcePath: resolvedPath,
-            originalName: importedName,
-          })
-        }
-      })
-    })
-
-  await Promise.all(importPromises)
-
-  // FIRST PASS: Find all local candidates
+  // 1. FIRST PASS: Find and register local candidates immediately.
+  // This ensures that circular imports can see these candidates even before 
+  // we finish processing this file's own imports.
   traverse(ast, {
     FunctionDeclaration(path) {
       const node = path.node
@@ -70,6 +44,7 @@ export async function findInlineCandidates(
       )
 
       if (type !== InlineCandidateType.NONE) {
+        if (DEBUG) console.log(`[unplugin-inline] Found candidate: ${funcName} in ${id}`)
         localCandidateNames.add(funcName)
         const body = t.cloneNode(node.body)
 
@@ -80,9 +55,15 @@ export async function findInlineCandidates(
           nodePath: path,
           localDependencies: new Set(),
         })
+
+        // Register early with minimal info
+        inlineRegistry.set(id, funcName, {
+          params: node.params as t.Identifier[],
+          body,
+          type,
+        })
       }
     },
-    // Arrow Functions
     VariableDeclarator(path) {
       const node = path.node
       const arrow = node.init
@@ -91,7 +72,6 @@ export async function findInlineCandidates(
         const funcName = node.id.name
         const parentDecl = path.parentPath
 
-        // 1. Defensively check the parent type
         if (!parentDecl.isVariableDeclaration()) return
 
         const grandParent = parentDecl.parentPath
@@ -107,6 +87,7 @@ export async function findInlineCandidates(
         )
 
         if (type === InlineCandidateType.NONE) return
+        if (DEBUG) console.log(`[unplugin-inline] Found candidate: ${funcName} in ${id}`)
         localCandidateNames.add(funcName)
         let body: t.BlockStatement
 
@@ -133,7 +114,34 @@ export async function findInlineCandidates(
     },
   })
 
-  // 3. SECOND PASS: Scout dependencies for each candidate
+  // 2. SECOND PASS: Resolve imports and trigger recursive discovery.
+  const importPromises = ast.program.body
+    .filter((node): node is t.ImportDeclaration => t.isImportDeclaration(node))
+    .map(async (node) => {
+      const source = node.source.value
+      const resolvedPath = await resolver(source, id)
+
+      if (!resolvedPath) return
+
+      await processImport(resolvedPath)
+
+      node.specifiers.forEach(spec => {
+        if (t.isImportSpecifier(spec) || t.isImportDefaultSpecifier(spec)) {
+          const importedName = t.isImportSpecifier(spec)
+            ? (t.isIdentifier(spec.imported) ? spec.imported.name : spec.imported.value)
+            : 'default'
+
+          importMap.set(spec.local.name, {
+            sourcePath: resolvedPath,
+            originalName: importedName,
+          })
+        }
+      })
+    })
+
+  await Promise.all(importPromises)
+
+  // 3. THIRD PASS: Scout dependencies for each candidate now that imports are resolved.
   for (const candidate of candidatesInFile) {
     const funcPath = candidate.nodePath.isVariableDeclarator()
       ? (candidate.nodePath.get('init') as any)
@@ -146,7 +154,7 @@ export async function findInlineCandidates(
       inlineRegistry,
     )
 
-    // Update the registry with the final candidate data
+    // Update the registry with final info if anything changed during dependency scouting
     inlineRegistry.set(id, candidate.normalizedName, {
       params: (funcPath.node as any).params,
       body: candidate.normalizedBody,
@@ -188,10 +196,6 @@ export function getDirective(comments: readonly t.Comment[] | null | undefined, 
   return InlineCandidateType.NONE
 }
 
-/**
- * Traverses a function to find external references that could be inlinable functions.
- * Using the live 'path.scope' here avoids the Null pointer error.
- */
 function scoutLocalDependencies(
   funcPath: any,
   localCandidateNames: Set<string>,
@@ -205,21 +209,15 @@ function scoutLocalDependencies(
       if (!path.isReferencedIdentifier()) return
       const name = path.node.name
 
-      // Ignore variables bound specifically inside this function (params/locals)
-      // Top-level module variables will now correctly pass through.
       if (isOwnedByFunction(name, path, funcPath.scope)) return
 
-      // If it's a local candidate, we MUST track it for sorting/cycle detection
       if (localCandidateNames.has(name)) {
         localDeps.add(name)
         return
       }
 
-      // If it's an import, check if the source is in the registry
       const imported = importMap.get(name)
       if (imported && inlineRegistry.has(imported.sourcePath, imported.originalName)) {
-        // This is an external dependency. We don't need to sort it
-        // locally, but the executeInlining phase will handle it.
         return
       }
     },
@@ -230,13 +228,14 @@ function scoutLocalDependencies(
 
   return localDeps
 }
+
 function isOwnedByFunction(name: string, currentPath: any, funcScope: any): boolean {
   const binding = currentPath.scope.getBinding(name)
   if (!binding) return false
   let scope = binding.scope
   while (scope) {
     if (scope === funcScope) return true
-    scope = scope.parent // walk up the tree
+    scope = scope.parent
   }
   return false
 }
