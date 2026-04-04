@@ -1,9 +1,69 @@
+import _generate from '@babel/generator'
 import _traverse, { type NodePath } from '@babel/traverse'
 import * as t from '@babel/types'
-import { InlineCandidateType, type InlinePluginOptions, type InlineTarget } from '../_types'
+import { InlineCandidateType, type InlinePluginOptions, type InlineTarget, ResolvedImport } from '../_types'
 import type { ErrorManager } from './ErrorManager'
+import type { InlineRegistry } from './InlineRegistry'
+import { isUsedInShortCircuit } from './validateFunctionForInlining'
 
 const traverse = ((_traverse as any).default || _traverse) as typeof _traverse
+const generate = ((_generate as any).default || _generate) as typeof _generate
+
+const DEBUG = process.env.DEBUG_UNPLUGIN_INLINE === 'true'
+
+export function applyInlining(
+  id: string,
+  opts: any,
+  ast: t.File,
+  importMap: Map<string, ResolvedImport>,
+  errorManager: ErrorManager,
+  inlineRegistry: InlineRegistry,
+): number {
+  let inlinedCount = 0
+  
+  traverse(ast, {
+    CallExpression(path) {
+      if (!t.isIdentifier(path.node.callee)) return
+      const name = path.node.callee.name
+
+      // Avoid self-recursion
+      const parentFunc = path.getFunctionParent()
+      let parentName: string | undefined
+      if (parentFunc) {
+        if (t.isFunctionDeclaration(parentFunc.node)) {
+          parentName = parentFunc.node.id?.name
+        } else if (parentFunc.parentPath.isVariableDeclarator() && t.isIdentifier(parentFunc.parentPath.node.id)) {
+          parentName = parentFunc.parentPath.node.id.name
+        }
+      }
+      if (name === parentName) return
+
+      const blueprint = resolveBlueprint(name, id, importMap, inlineRegistry)
+      if (blueprint) {
+        if (DEBUG) console.log(`[unplugin-inline] Attempting to inline '${name}' in ${id}`)
+        if (isUsedInShortCircuit(path)) {
+          throw errorManager.makeValidationError(`Cannot inline function '${name}': used in short-circuiting expression.`, path.node)
+        }
+        executeInlining(path, opts, blueprint, errorManager)
+        inlinedCount++
+      }
+    },
+    Function(p) {
+      const node = p.node
+      let name: string | undefined
+      if (t.isFunctionDeclaration(node) && node.id) {
+        name = node.id.name
+      } else if (p.parentPath.isVariableDeclarator() && t.isIdentifier(p.parentPath.node.id)) {
+        name = p.parentPath.node.id.name
+      }
+      if (name && inlineRegistry.has(id, name)) {
+        p.skip()
+      }
+    },
+  })
+  
+  return inlinedCount
+}
 
 export function executeInlining(
   path: NodePath<t.CallExpression>,
@@ -22,7 +82,12 @@ export function executeInlining(
 
   let shouldUseMacro = false
 
-  console.log(`[unplugin-inline] inlining: ${funcName}` + (blueprint.type === InlineCandidateType.MACRO ? ' (macro)' : ''))
+  if (DEBUG) {
+     console.log(`[unplugin-inline] executeInlining context for '${funcName}':`)
+     console.log(`  blueprint.type: ${blueprint.type}`)
+     console.log(`  opts.autoConvertInlineToMacro: ${opts.autoConvertInlineToMacro}`)
+     console.log(`  macroExpr: ${macroExpr ? 'FOUND' : 'NULL'}`)
+  }
 
   if (blueprint.type === InlineCandidateType.MACRO) {
     if (!macroExpr) {
@@ -30,6 +95,7 @@ export function executeInlining(
     }
 
     const safetyCheck = checkSubstitutionSafety(args, params, macroExpr)
+    if (DEBUG) console.log(`[unplugin-inline] Macro safety check for '${funcName}': ${safetyCheck.safe ? 'SAFE' : 'UNSAFE'}`)
 
     if (!safetyCheck.safe) {
       const { argIndex, paramName, refCount } = safetyCheck
@@ -45,6 +111,7 @@ export function executeInlining(
     macroExpr
   ) {
     const safetyCheck = checkSubstitutionSafety(args, params, macroExpr)
+    if (DEBUG) console.log(`[unplugin-inline] Auto-macro conversion safety check for '${funcName}': ${safetyCheck.safe ? 'SAFE' : 'UNSAFE'}`)
 
     if (safetyCheck.safe) {
       shouldUseMacro = true
@@ -52,36 +119,25 @@ export function executeInlining(
   }
 
   if (shouldUseMacro && macroExpr) {
-    const tempProgram = t.program([t.expressionStatement(t.cloneNode(macroExpr))])
-
-    traverse(tempProgram, {
-      Identifier(idPath) {
-        const paramIndex = params.findIndex(p => p.name === idPath.node.name)
-
-        if (paramIndex !== -1) {
-          const arg = args[paramIndex]
-
-          if (arg) {
-            idPath.replaceWith(t.parenthesizedExpression(t.cloneNode(arg)))
-            idPath.skip()
-          }
-        }
-      },
-      noScope: true,
-    }, path.scope)
-
-    const mutatedExpr = (tempProgram.body[0] as t.ExpressionStatement).expression
+    const mutatedExpr = substituteMacro(macroExpr, params, args, path.scope)
+    
+    if (DEBUG) {
+      const before = generate(path.node).code
+      const after = generate(mutatedExpr).code
+      console.log(`[unplugin-inline] Macro replaced: ${before} -> ${after}`)
+    }
 
     path.replaceWith(t.parenthesizedExpression(mutatedExpr))
     return
   }
+
+  if (DEBUG) console.log(`[unplugin-inline] Falling back to block-inlining for '${funcName}'`)
 
   const resultId = path.scope.generateUidIdentifier(`${funcName}Result`)
   const labelId = path.scope.generateUidIdentifier(`${funcName}Label`)
 
   const callerArgs = path.node.arguments.map(arg => t.cloneNode(arg as t.Expression))
 
-  // 1. Create a dummy function to safely utilize Babel's scope tracking
   const dummyFunc = t.functionDeclaration(
     t.identifier('__dummy__'),
     blueprint.params.map(p => t.cloneNode(p as any)),
@@ -90,7 +146,6 @@ export function executeInlining(
 
   const tempFile = t.file(t.program([dummyFunc]))
 
-  // 2. Rename parameters and internal variables safely
   traverse(tempFile, {
     FunctionDeclaration(funcPath) {
       if (funcPath.node.id?.name === '__dummy__') {
@@ -115,7 +170,6 @@ export function executeInlining(
     },
   }, path.scope)
 
-  // 3. Declare Arguments via Array Pattern safely: let [_arg_a, _arg_b] = [10, 20];
   const argDecls = []
 
   if (dummyFunc.params.length > 0 || callerArgs.length > 0) {
@@ -132,7 +186,6 @@ export function executeInlining(
   const finalStatements = [...argDecls, ...dummyFunc.body.body]
   const labeledBlock = t.labeledStatement(labelId, t.blockStatement(finalStatements))
 
-  // 4. Transform Return Statements to Assignments + Break
   traverse(labeledBlock, {
     ReturnStatement(returnPath) {
       const val = returnPath.node.argument || t.identifier('undefined')
@@ -148,14 +201,12 @@ export function executeInlining(
     noScope: true,
   })
 
-  // 5. Safely locate the insertion point
   const parentStmt = path.getStatementParent()
 
   if (!parentStmt) return
 
   const parentBlock = path.findParent(p => p.isBlockStatement())
 
-  // SAFETY MEASURE: Ensure we have a block to insert our variables into
   if (parentBlock) {
     parentStmt.insertBefore([
       t.variableDeclaration('let', [t.variableDeclarator(resultId)]),
@@ -165,11 +216,9 @@ export function executeInlining(
   } else {
     const arrowParent = path.findParent(p => p.isArrowFunctionExpression())
 
-    // If it's an arrow function with an expression body, e.g. `() => add()`
     if (arrowParent && t.isArrowFunctionExpression(arrowParent.node)) {
       const node = arrowParent.node
 
-      // Convert to a block statement body: `() => { return add(); }`
       if (!t.isBlockStatement(node.body)) {
         const bodyPath = arrowParent.get('body') as NodePath<t.Expression>
         const originalBody = t.cloneNode(bodyPath.node)
@@ -180,13 +229,11 @@ export function executeInlining(
           ]),
         )
 
-        // Retry inlining now that a safe block exists
         executeInlining(path, opts, blueprint, errorManager)
         return
       }
     }
 
-    // Fallback if no arrow parent found
     parentStmt.insertBefore([
       t.variableDeclaration('let', [t.variableDeclarator(resultId)]),
       labeledBlock,
@@ -195,25 +242,23 @@ export function executeInlining(
   }
 }
 
-/**
- * Optimized macro substitution that avoids unnecessary parentheses for simple nodes.
- */
-function substituteMacro(expr: t.Expression, params: t.Identifier[], args: t.Expression[]): t.Expression {
+function substituteMacro(expr: t.Expression, params: t.Identifier[], args: t.Expression[], scope: any): t.Expression {
   const cloned = t.cloneNode(expr)
   const tempProg = t.program([t.expressionStatement(cloned)])
 
   traverse(tempProg, {
     Identifier(p) {
+      if (!p.isReferencedIdentifier()) return
       const idx = params.findIndex(param => param.name === p.node.name)
       if (idx !== -1) {
         const arg = args[idx] || t.identifier('undefined')
-        // Minification: Only wrap in parens if it's a complex expression
         const needsParens = !t.isIdentifier(arg) && !t.isLiteral(arg) && !t.isMemberExpression(arg)
         p.replaceWith(needsParens ? t.parenthesizedExpression(t.cloneNode(arg)) : t.cloneNode(arg))
+        p.skip()
       }
     },
     noScope: true,
-  })
+  }, scope)
 
   return (tempProg.body[0] as t.ExpressionStatement).expression
 }
@@ -290,4 +335,40 @@ function checkSubstitutionSafety(
   return {
     safe: true,
   }
+}
+
+export function resolveBlueprint(
+  name: string,
+  currentFile: string,
+  importMap: Map<string, ResolvedImport>,
+  inlineRegistry: InlineRegistry,
+) {
+  if (inlineRegistry.has(currentFile, name)) {
+    return inlineRegistry.get(currentFile, name)
+  }
+  const imported = importMap.get(name)
+  if (imported) {
+    return inlineRegistry.get(imported.sourcePath, imported.originalName)
+  }
+}
+
+export function verifyNoLeakedReferences(
+  id: string,
+  ast: t.File,
+  importMap: Map<string, ResolvedImport>,
+  inlineRegistry: InlineRegistry,
+  errorManager: ErrorManager,
+) {
+  traverse(ast, {
+    CallExpression(path) {
+      if (!t.isIdentifier(path.node.callee)) return
+      const name = path.node.callee.name
+      const blueprint = resolveBlueprint(name, id, importMap, inlineRegistry)
+      if (blueprint) {
+        if (DEBUG) {
+          console.warn(`[unplugin-inline] WARNING: Leaked reference to inlinable function '${name}' found in ${id}. This call was not inlined.`)
+        }
+      }
+    },
+  })
 }

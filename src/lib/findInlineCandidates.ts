@@ -26,8 +26,6 @@ export async function findInlineCandidates(
   const localCandidateNames = new Set<string>()
 
   // 1. FIRST PASS: Find and register local candidates immediately.
-  // This ensures that circular imports can see these candidates even before 
-  // we finish processing this file's own imports.
   traverse(ast, {
     FunctionDeclaration(path) {
       const node = path.node
@@ -56,9 +54,9 @@ export async function findInlineCandidates(
           localDependencies: new Set(),
         })
 
-        // Register early with minimal info
+        // Register early with cloned params
         inlineRegistry.set(id, funcName, {
-          params: node.params as t.Identifier[],
+          params: node.params.map(p => t.cloneNode(p as any)),
           body,
           type,
         })
@@ -106,7 +104,7 @@ export async function findInlineCandidates(
         })
 
         inlineRegistry.set(id, funcName, {
-          params: arrow.params as t.Identifier[],
+          params: arrow.params.map(p => t.cloneNode(p as any)),
           body,
           type,
         })
@@ -114,7 +112,8 @@ export async function findInlineCandidates(
     },
   })
 
-  // 2. SECOND PASS: Resolve imports and trigger recursive discovery.
+  // 2. SECOND PASS: Resolve imports. 
+  // We populate the importMap BEFORE recursing to ensure circularities don't get an empty map.
   const importPromises = ast.program.body
     .filter((node): node is t.ImportDeclaration => t.isImportDeclaration(node))
     .map(async (node) => {
@@ -122,8 +121,6 @@ export async function findInlineCandidates(
       const resolvedPath = await resolver(source, id)
 
       if (!resolvedPath) return
-
-      await processImport(resolvedPath)
 
       node.specifiers.forEach(spec => {
         if (t.isImportSpecifier(spec) || t.isImportDefaultSpecifier(spec)) {
@@ -137,6 +134,9 @@ export async function findInlineCandidates(
           })
         }
       })
+
+      // Now recurse
+      await processImport(resolvedPath)
     })
 
   await Promise.all(importPromises)
@@ -156,7 +156,7 @@ export async function findInlineCandidates(
 
     // Update the registry with final info if anything changed during dependency scouting
     inlineRegistry.set(id, candidate.normalizedName, {
-      params: (funcPath.node as any).params,
+      params: (funcPath.node as any).params.map((p: any) => t.cloneNode(p)),
       body: candidate.normalizedBody,
       type: candidate.type,
     })

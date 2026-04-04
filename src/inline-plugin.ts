@@ -8,12 +8,12 @@ import { createUnplugin } from 'unplugin'
 import type { FileResolver, InlinePluginOptions, ResolvedImport } from './_types'
 import { FILE_EXTENSIONS, STANDARD_GLOBALS } from './defaults'
 import { normalizePath } from './lib/_helpers'
-import { ERROR_PREFIX, type ErrorManager, makeErrorManager } from './lib/ErrorManager'
-import { executeInlining } from './lib/executeInlining'
+import { makeErrorManager } from './lib/ErrorManager'
+import { applyInlining, verifyNoLeakedReferences } from './lib/executeInlining'
 import { findInlineCandidates } from './lib/findInlineCandidates'
 import { flattenInlinedFunctions } from './lib/flattenInlinedFunctions'
-import { type InlineRegistry, makeInlineRegistry } from './lib/InlineRegistry'
-import { isUsedInShortCircuit, validateFunctionForInlining } from './lib/validateFunctionForInlining'
+import { makeInlineRegistry } from './lib/InlineRegistry'
+import { validateFunctionForInlining } from './lib/validateFunctionForInlining'
 
 const traverse = ((_traverse as any).default || _traverse) as typeof _traverse
 const generate = ((_generate as any).default || _generate) as typeof _generate
@@ -31,12 +31,8 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
     ...options ?? {},
   }
 
-  if (!(typeof opts.variableNamePrefix === 'string') || opts.variableNamePrefix === '') {
-    throw new Error(`${ERROR_PREFIX} opts.variableNamePrefix is required`)
-  }
-
   const inlineRegistry = makeInlineRegistry()
-  const discoveryCache = new Map<string, Promise<any>>()
+  const discoveryCache = new Map<string, Promise<{ candidatesInFile: any[], importMap: Map<string, ResolvedImport> }>>()
 
   return {
     name: 'unplugin-inline',
@@ -55,7 +51,72 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
       const normId = normalizePath(cleanId)
       const errorManager = makeErrorManager(cleanId)
 
-      if (DEBUG) console.log(`[unplugin-inline] Transform starting: ${normId}`)
+      // Always clear the current file from the discovery cache to ensure 
+      // we use the latest code/AST provided by the transform hook.
+      discoveryCache.delete(normId)
+
+      if (DEBUG) console.log(`[unplugin-inline] Transform: ${normId}`)
+
+      const plugins: any[] = ['typescript', 'decorators-legacy']
+      if (normId.endsWith('.tsx') || normId.endsWith('.jsx')) plugins.push('jsx')
+
+      const ast = parse(code, { sourceType: 'module', plugins, attachComment: true })
+
+      const getOrDiscoverFile = (targetId: string, targetAst?: t.File, stack = new Set<string>()): Promise<{
+        candidatesInFile: any[],
+        importMap: Map<string, ResolvedImport>
+      }> => {
+        const normTarget = normalizePath(targetId)
+
+        // Circularity break
+        if (stack.has(normTarget)) {
+          return Promise.resolve({ candidatesInFile: [], importMap: new Map() })
+        }
+
+        // Atomic check
+        const cached = discoveryCache.get(normTarget)
+        if (cached) return cached
+
+        const run = async () => {
+          const isCurrentFile = normTarget === normId
+          const workingAst = (isCurrentFile && targetAst) ? targetAst : parse(await fs.promises.readFile(normTarget, 'utf-8'), {
+            sourceType: 'module',
+            plugins,
+            attachComment: true,
+          })
+          const errMgr = makeErrorManager(normTarget)
+          const nextStack = new Set(stack)
+          nextStack.add(normTarget)
+
+          const result = await findInlineCandidates(
+            normTarget, opts, workingAst, resolver, inlineRegistry,
+            (p) => getOrDiscoverFile(p, undefined, nextStack).then(() => {
+            }),
+          )
+
+          for (const candidate of result.candidatesInFile) {
+            validateFunctionForInlining(normTarget, opts, candidate, errMgr, result.importMap, inlineRegistry)
+          }
+
+          // Check for validation errors (like recursion) BEFORE attempting to flatten/sort.
+          // This ensures Test 1 (factorial) reports the correct error message.
+          if (errMgr.hasValidationErrors()) {
+            throw errMgr.reportValidationErrors()
+          }
+
+          flattenInlinedFunctions(normTarget, opts, result.candidatesInFile, inlineRegistry, errMgr, result.importMap)
+
+          if (errMgr.hasValidationErrors()) {
+            throw errMgr.reportValidationErrors()
+          }
+
+          return result
+        }
+
+        const task = run()
+        discoveryCache.set(normTarget, task)
+        return task
+      }
 
       let resolver: FileResolver
       if (typeof this.resolve === 'function') {
@@ -67,90 +128,25 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
         resolver = makeFallbackResolver(opts.fileExtensions)
       }
 
-      /**
-       * Recursively discovers inlinable functions in dependencies.
-       * Breaks circularity by returning existing promises from the cache.
-       */
-      const greedyProcessFile = async (targetPath: string): Promise<void> => {
-        const normTarget = normalizePath(targetPath)
-        
-        const cached = discoveryCache.get(normTarget)
-        if (cached) {
-          return cached
-        }
+      const { importMap } = await getOrDiscoverFile(normId, ast)
 
-        const runDiscovery = async () => {
-          if (DEBUG) console.log(`[unplugin-inline] Greedily discovering: ${normTarget}`)
-          try {
-            const fileCode = await fs.promises.readFile(normTarget, 'utf-8')
-            const fileAst = parse(fileCode, { sourceType: 'module', plugins: ['typescript'] })
-            const errMgr = makeErrorManager(normTarget)
-
-            // findInlineCandidates will call greedyProcessFile recursively
-            const { candidatesInFile, importMap } = await findInlineCandidates(
-              normTarget, opts, fileAst, resolver, inlineRegistry, greedyProcessFile,
-            )
-
-            for (const candidate of candidatesInFile) {
-              validateFunctionForInlining(normTarget, opts, candidate, errMgr, importMap, inlineRegistry)
-            }
-            flattenInlinedFunctions(normTarget, opts, candidatesInFile, inlineRegistry, errMgr)
-            if (errMgr.hasValidationErrors()) {
-              throw errMgr.reportValidationErrors()
-            }
-          } catch (e: any) {
-            if (e?.code === 'ENOENT' || e?.code === 'EISDIR') return
-            throw e
-          }
-        }
-
-        const task = runDiscovery()
-        discoveryCache.set(normTarget, task)
-        return task
-      }
-
-      const ast = parse(code, { sourceType: 'module', plugins: ['typescript'] })
-
-      // Logic change: We define the task but DON'T register it in the cache yet.
-      // This allows the first findInlineCandidates call to be the "owner" of the 
-      // recursive chain. 
-      const transformDiscoveryTask = (async () => {
-        return await findInlineCandidates(
-          normId, opts, ast, resolver, inlineRegistry,
-          greedyProcessFile,
-        )
-      })()
-
-      // To handle circular imports from dependencies BACK to this file:
-      if (!discoveryCache.has(normId)) {
-        discoveryCache.set(normId, transformDiscoveryTask)
-      }
-
-      const { candidatesInFile, importMap } = await transformDiscoveryTask
-
-      // 2. PHASE 2: Validation & Flattening (Local)
-      for (const candidate of candidatesInFile) {
-        validateFunctionForInlining(id, opts, candidate, errorManager, importMap, inlineRegistry)
-        if (errorManager.hasValidationErrors()) {
-          inlineRegistry.delete(id, candidate.normalizedName)
-          throw errorManager.reportValidationErrors()
-        }
-      }
-      flattenInlinedFunctions(id, opts, candidatesInFile, inlineRegistry, errorManager)
-
-      // 3. PHASE 3: Application
-      applyInlining(id, opts, ast, importMap, errorManager, inlineRegistry)
-
-      // 4. PHASE 4: Cleanup
-      verifyNoLeakedReferences(id, ast, importMap, inlineRegistry, errorManager)
-      removeInlinedFunctions(ast, opts)
+      const inlinedCount = applyInlining(normId, opts, ast, importMap, errorManager, inlineRegistry)
+      verifyNoLeakedReferences(normId, ast, importMap, inlineRegistry, errorManager)
+      const removedCount = removeInlinedFunctions(ast, opts)
 
       traverse.cache.clear()
       cleanupUnusedImports(ast)
 
-      const { code: generatedCode, map } = generate(ast, { sourceMaps: true }, code)
+      const { code: generatedCode, map } = generate(ast, {
+        sourceMaps: true,
+        retainLines: false,
+        compact: false,
+      })
 
-      if (DEBUG) console.log(`[unplugin-inline] Transform completed: ${normId}`)
+      if (DEBUG) {
+        if (inlinedCount > 0) console.log(`[unplugin-inline] Inlined ${inlinedCount} calls in ${normId}`)
+        if (removedCount > 0) console.log(`[unplugin-inline] Removed ${removedCount} inlinable definitions from ${normId}`)
+      }
 
       return {
         code: generatedCode,
@@ -160,55 +156,8 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
   }
 })
 
-export function applyInlining(
-  id: string,
-  opts: any,
-  ast: t.File,
-  importMap: Map<string, ResolvedImport>,
-  errorManager: ErrorManager,
-  inlineRegistry: InlineRegistry,
-) {
-  traverse(ast, {
-    CallExpression(path) {
-      if (!t.isIdentifier(path.node.callee)) return
-      const name = path.node.callee.name
-
-      // Avoid self-recursion
-      const parentFunc = path.getFunctionParent()
-      let parentName: string | undefined
-      if (parentFunc) {
-        if (t.isFunctionDeclaration(parentFunc.node)) {
-          parentName = parentFunc.node.id?.name
-        } else if (parentFunc.parentPath.isVariableDeclarator() && t.isIdentifier(parentFunc.parentPath.node.id)) {
-          parentName = parentFunc.parentPath.node.id.name
-        }
-      }
-      if (name === parentName) return
-
-      const blueprint = resolveBlueprint(name, id, importMap, inlineRegistry)
-      if (blueprint) {
-        if (isUsedInShortCircuit(path)) {
-          throw errorManager.makeValidationError(`Cannot inline function '${name}': used in short-circuiting expression.`, path.node)
-        }
-        executeInlining(path, opts, blueprint, errorManager)
-      }
-    },
-    Function(p) {
-      const node = p.node
-      let name: string | undefined
-      if (t.isFunctionDeclaration(node) && node.id) {
-        name = node.id.name
-      } else if (p.parentPath.isVariableDeclarator() && t.isIdentifier(p.parentPath.node.id)) {
-        name = p.parentPath.node.id.name
-      }
-      if (name && inlineRegistry.has(id, name)) {
-        p.skip()
-      }
-    },
-  })
-}
-
-export function removeInlinedFunctions(ast: t.File, opts: any) {
+export function removeInlinedFunctions(ast: t.File, opts: any): number {
+  let removedCount = 0
   const isMarked = (comments: readonly t.Comment[] | null | undefined) =>
     comments?.some(c =>
       c.value.includes(opts.inlineIdentifier) ||
@@ -217,46 +166,54 @@ export function removeInlinedFunctions(ast: t.File, opts: any) {
 
   traverse(ast, {
     FunctionDeclaration(path) {
-      if (isMarked(path.node.leadingComments)) {
-        if (t.isExportNamedDeclaration(path.parent)) {
-          path.parentPath.remove()
+      const parent = path.parentPath
+      const isExported = parent.isExportNamedDeclaration()
+      const comments = [
+        ...(path.node.leadingComments || []),
+        ...(isExported ? (parent.node as any).leadingComments || [] : []),
+      ]
+
+      if (isMarked(comments)) {
+        if (DEBUG) console.log(`[unplugin-inline] Marked FunctionDeclaration for removal: ${path.node.id?.name || 'anonymous'}`)
+
+        path.node.leadingComments = null
+        if (isExported) (parent.node as any).leadingComments = null
+
+        if (isExported) {
+          parent.remove()
         } else {
           path.remove()
         }
+        removedCount++
       }
     },
     VariableDeclarator(path) {
-      const arrow = path.node.init
-      if (t.isArrowFunctionExpression(arrow) && t.isIdentifier(path.node.id)) {
-        const parentDecl = path.parentPath
-        if (!parentDecl.isVariableDeclaration()) return
-        if (isMarked(parentDecl.node.leadingComments)) {
-          const grandParent = parentDecl.parentPath
-          if (parentDecl.node.declarations.length === 1 &&
-            (grandParent?.isExportNamedDeclaration() || grandParent?.isExportDefaultDeclaration())) {
-            grandParent.remove()
-          } else {
-            path.remove()
-          }
+      const parentDecl = path.parentPath
+      if (!parentDecl.isVariableDeclaration()) return
+
+      const grandParent = parentDecl.parentPath
+      const isExported = grandParent.isExportNamedDeclaration()
+      const comments = [
+        ...(parentDecl.node.leadingComments || []),
+        ...(isExported ? (grandParent.node as any).leadingComments || [] : []),
+      ]
+
+      if (isMarked(comments)) {
+        if (DEBUG) console.log(`[unplugin-inline] Marked VariableDeclarator for removal: ${(path.node.id as any)?.name || 'anonymous'}`)
+
+        parentDecl.node.leadingComments = null
+        if (isExported) (grandParent.node as any).leadingComments = null
+
+        if (parentDecl.node.declarations.length === 1 && (isExported || grandParent.isExportDefaultDeclaration())) {
+          grandParent.remove()
+        } else {
+          path.remove()
         }
+        removedCount++
       }
     },
   })
-}
-
-function resolveBlueprint(
-  name: string,
-  currentFile: string,
-  importMap: Map<string, ResolvedImport>,
-  inlineRegistry: InlineRegistry,
-) {
-  if (inlineRegistry.has(currentFile, name)) {
-    return inlineRegistry.get(currentFile, name)
-  }
-  const imported = importMap.get(name)
-  if (imported) {
-    return inlineRegistry.get(imported.sourcePath, imported.originalName)
-  }
+  return removedCount
 }
 
 export function makeFallbackResolver(extensions: string[]): FileResolver {
@@ -282,28 +239,11 @@ export function makeFallbackResolver(extensions: string[]): FileResolver {
   }
 }
 
-export function verifyNoLeakedReferences(
-  id: string,
-  ast: t.File,
-  importMap: Map<string, ResolvedImport>,
-  inlineRegistry: InlineRegistry,
-  errorManager: ErrorManager,
-) {
-  traverse(ast, {
-    CallExpression(path) {
-      if (!t.isIdentifier(path.node.callee)) return
-      const name = path.node.callee.name
-      const blueprint = resolveBlueprint(name, id, importMap, inlineRegistry)
-      if (blueprint) {
-        // Log or throw if needed
-      }
-    },
-  })
-}
-
 export function cleanupUnusedImports(ast: t.File) {
   traverse(ast, {
     ImportDeclaration(path) {
+      path.scope.crawl()
+
       if (path.node.specifiers.length === 0) return
       const specifiers = path.get('specifiers')
       specifiers.forEach(specifierPath => {

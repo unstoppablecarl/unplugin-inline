@@ -1,8 +1,8 @@
 import _traverse from '@babel/traverse'
 import * as t from '@babel/types'
-import type { InlineCandidate, InlinePluginOptions } from '../_types'
-import { type ErrorManager, makeErrorManager } from './ErrorManager'
-import { executeInlining } from './executeInlining'
+import { InlineCandidate, InlinePluginOptions, ResolvedImport } from '../_types'
+import { ErrorManager, makeErrorManager } from './ErrorManager'
+import { executeInlining, resolveBlueprint } from './executeInlining'
 import type { InlineRegistry } from './InlineRegistry'
 
 const traverse = ((_traverse as any).default || _traverse) as typeof _traverse
@@ -13,8 +13,8 @@ export function flattenInlinedFunctions(
   candidatesInFile: InlineCandidate[],
   inlineRegistry: InlineRegistry,
   errorManager: ErrorManager,
+  importMap: Map<string, ResolvedImport>,
 ): void {
-  // getSortedOrder now throws a validation error if a cycle is found
   const sortedNames = getSortedOrder(id, candidatesInFile)
 
   for (const name of sortedNames) {
@@ -28,12 +28,10 @@ export function flattenInlinedFunctions(
           const p = nodePath
           return (t.isFunctionDeclaration(p.node) && p.node.id?.name === name) ||
             (t.isVariableDeclarator(p.node) && t.isIdentifier((p.node as any).id) && (p.node as any).id.name === name)
-        })?.nodePath?.node, // Safely fall back to undefined if not found
+        })?.nodePath?.node,
       )
     }
 
-    // Wrap the blueprint body in a temporary file/program
-    // This gives Babel the necessary scope structures to perform renames
     const tempFile = t.file(t.program([...t.cloneNode(target.body).body]))
 
     traverse(tempFile, {
@@ -41,9 +39,10 @@ export function flattenInlinedFunctions(
         if (!t.isIdentifier(path.node.callee)) return
 
         const calledName = path.node.callee.name
-        const dependency = inlineRegistry.get(id, calledName)
+        
+        // Try local or imported blueprints
+        const dependency = resolveBlueprint(calledName, id, importMap, inlineRegistry)
 
-        // If the call is to another inlinable function in the registry, flatten it
         if (dependency) {
           executeInlining(path, opts, dependency, errorManager)
         }
@@ -53,8 +52,6 @@ export function flattenInlinedFunctions(
       },
     })
 
-    // Extract the flattened block back into the registry
-    // target.body = (tempFile.program.body[0] as t.BlockStatement)
     target.body = t.blockStatement(tempFile.program.body)
   }
 }
@@ -81,7 +78,6 @@ export function getSortedOrder(
       const cyclePath = [...stackArr.slice(cycleStart), name].join(' -> ')
 
       const err = makeErrorManager(id)
-      // We pass the actual AST node of the function declaration to the error manager
       throw err.makeUsageError(
         `Circular dependency detected in @__INLINE__ functions: ${cyclePath}`,
         candidate.nodePath.node,
