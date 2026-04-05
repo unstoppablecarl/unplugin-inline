@@ -33,6 +33,9 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
 
   const inlineRegistry = makeInlineRegistry()
   const discoveryCache = new Map<string, Promise<{ candidatesInFile: any[], importMap: Map<string, ResolvedImport> }>>()
+  // Per-transform in-memory ASTs, keyed by normalized path
+  // Used ONLY to override disk reads during the current build pass
+  const liveAstMap = new Map<string, t.File>()
 
   return {
     name: 'unplugin-inline',
@@ -51,46 +54,52 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
       const normId = normalizePath(cleanId)
       const errorManager = makeErrorManager(cleanId)
 
-      // Always clear the current file from the discovery cache to ensure 
-      // we use the latest code/AST provided by the transform hook.
-      discoveryCache.delete(normId)
-
       if (DEBUG) console.log(`[unplugin-inline] Transform: ${normId}`)
 
-      const plugins: any[] = ['typescript', 'decorators-legacy']
-      if (normId.endsWith('.tsx') || normId.endsWith('.jsx')) plugins.push('jsx')
+      const ast = parse(code, { sourceType: 'module', plugins: pluginsFor(normId), attachComment: true })
 
-      const ast = parse(code, { sourceType: 'module', plugins, attachComment: true })
+      // Register this file's live AST so concurrent discoverers use it
+      // instead of reading stale disk content
+      liveAstMap.set(normId, ast)
 
-      const getOrDiscoverFile = (targetId: string, targetAst?: t.File, stack = new Set<string>()): Promise<{
+      // Invalidate only this file's discovery (not the whole shared cache)
+      // but only AFTER registering the live AST to avoid a race window
+      discoveryCache.delete(normId)
+
+      /**
+       * Ensures a file is fully discovered, validated, and flattened.
+       * Uses a stack to safely break circular dependency chains.
+       */
+      const getOrDiscoverFile = (targetId: string, stack = new Set<string>()): Promise<{
         candidatesInFile: any[],
         importMap: Map<string, ResolvedImport>
       }> => {
         const normTarget = normalizePath(targetId)
 
-        // Circularity break
+        // Circularity break: returns empty result to allow the parent to continue.
+        // The registry will still contain candidates registered by the original call.
         if (stack.has(normTarget)) {
           return Promise.resolve({ candidatesInFile: [], importMap: new Map() })
         }
 
-        // Atomic check
+        // Atomic check to prevent race conditions in parallel builds
         const cached = discoveryCache.get(normTarget)
         if (cached) return cached
 
         const run = async () => {
-          const isCurrentFile = normTarget === normId
-          const workingAst = (isCurrentFile && targetAst) ? targetAst : parse(await fs.promises.readFile(normTarget, 'utf-8'), {
-            sourceType: 'module',
-            plugins,
-            attachComment: true,
-          })
+          const workingAst = liveAstMap.get(normTarget)
+            ?? parse(await fs.promises.readFile(normTarget, 'utf-8'), {
+              sourceType: 'module',
+              plugins: pluginsFor(normTarget),
+              attachComment: true,
+            })
           const errMgr = makeErrorManager(normTarget)
           const nextStack = new Set(stack)
           nextStack.add(normTarget)
 
           const result = await findInlineCandidates(
             normTarget, opts, workingAst, resolver, inlineRegistry,
-            (p) => getOrDiscoverFile(p, undefined, nextStack).then(() => {
+            (p) => getOrDiscoverFile(p, nextStack).then(() => {
             }),
           )
 
@@ -99,7 +108,6 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
           }
 
           // Check for validation errors (like recursion) BEFORE attempting to flatten/sort.
-          // This ensures Test 1 (factorial) reports the correct error message.
           if (errMgr.hasValidationErrors()) {
             throw errMgr.reportValidationErrors()
           }
@@ -128,9 +136,10 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
         resolver = makeFallbackResolver(opts.fileExtensions)
       }
 
-      const { importMap } = await getOrDiscoverFile(normId, ast)
+      const { importMap } = await getOrDiscoverFile(normId)
 
       const inlinedCount = applyInlining(normId, opts, ast, importMap, errorManager, inlineRegistry)
+
       verifyNoLeakedReferences(normId, ast, importMap, inlineRegistry, errorManager)
       const removedCount = removeInlinedFunctions(ast, opts)
 
@@ -258,4 +267,10 @@ export function cleanupUnusedImports(ast: t.File) {
       }
     },
   })
+}
+
+const pluginsFor = (target: string) => {
+  const p: any[] = ['typescript', 'decorators-legacy']
+  if (target.endsWith('.tsx') || target.endsWith('.jsx')) p.push('jsx')
+  return p
 }
