@@ -146,11 +146,13 @@ export const inlinePlugin = createUnplugin((options?: Partial<InlinePluginOption
       traverse.cache.clear()
       cleanupUnusedImports(ast)
 
+      // Provide original code and filename to Babel for accurate source maps
       const { code: generatedCode, map } = generate(ast, {
         sourceMaps: true,
+        sourceFileName: id,
         retainLines: false,
         compact: false,
-      })
+      }, code)
 
       if (DEBUG) {
         if (inlinedCount > 0) console.log(`[unplugin-inline] Inlined ${inlinedCount} calls in ${normId}`)
